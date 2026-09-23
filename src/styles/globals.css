@@ -1,0 +1,354 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== ROOT VARIABLES ===== */
+:root {
+  --cyan: #00f5ff;
+  --purple: #9333ea;
+  --navy: #050d1f;
+  --bg: #020818;
+}
+
+/* ===== BASE STYLES ===== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #020818;
+  color: #ffffff;
+  font-family: 'Rajdhani', sans-serif;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #050d1f;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 245, 255, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 245, 255, 0.6);
+}
+
+/* ===== TYPOGRAPHY ===== */
+.font-display {
+  font-family: 'Orbitron', monospace;
+}
+.font-body {
+  font-family: 'Rajdhani', sans-serif;
+}
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ===== GLASS MORPHISM ===== */
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-cyan {
+  background: rgba(0, 245, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 245, 255, 0.15);
+}
+
+.glass-purple {
+  background: rgba(147, 51, 234, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(147, 51, 234, 0.2);
+}
+
+.glass-dark {
+  background: rgba(2, 8, 24, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ===== NEON TEXT ===== */
+.text-neon-cyan {
+  color: #00f5ff;
+  text-shadow: 0 0 10px rgba(0, 245, 255, 0.7), 0 0 20px rgba(0, 245, 255, 0.4);
+}
+
+.text-neon-purple {
+  color: #a855f7;
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.7), 0 0 20px rgba(168, 85, 247, 0.4);
+}
+
+.text-neon-white {
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+/* ===== NEON BORDERS ===== */
+.border-neon-cyan {
+  border-color: rgba(0, 245, 255, 0.4);
+  box-shadow: 0 0 10px rgba(0, 245, 255, 0.2), inset 0 0 10px rgba(0, 245, 255, 0.05);
+}
+
+.border-neon-purple {
+  border-color: rgba(147, 51, 234, 0.4);
+  box-shadow: 0 0 10px rgba(147, 51, 234, 0.2), inset 0 0 10px rgba(147, 51, 234, 0.05);
+}
+
+/* ===== BUTTONS ===== */
+.btn-primary {
+  @apply relative px-8 py-3 font-display font-bold text-sm tracking-widest uppercase rounded-lg transition-all duration-300 overflow-hidden;
+  background: linear-gradient(135deg, #00f5ff, #0066ff);
+  color: #020818;
+  box-shadow: 0 0 20px rgba(0, 245, 255, 0.4);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 30px rgba(0, 245, 255, 0.7), 0 0 60px rgba(0, 245, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  @apply relative px-8 py-3 font-display font-bold text-sm tracking-widest uppercase rounded-lg transition-all duration-300;
+  background: transparent;
+  border: 1px solid rgba(0, 245, 255, 0.4);
+  color: #00f5ff;
+}
+
+.btn-secondary:hover {
+  background: rgba(0, 245, 255, 0.08);
+  border-color: rgba(0, 245, 255, 0.8);
+  box-shadow: 0 0 20px rgba(0, 245, 255, 0.3);
+}
+
+.btn-ghost {
+  @apply relative px-8 py-3 font-display font-bold text-sm tracking-widest uppercase rounded-lg transition-all duration-300;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.btn-ghost:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ===== ANSWER BUTTONS ===== */
+.answer-btn {
+  @apply relative w-full p-4 rounded-xl transition-all duration-200 text-left;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.answer-btn:hover:not(:disabled) {
+  background: rgba(0, 245, 255, 0.06);
+  border-color: rgba(0, 245, 255, 0.3);
+  transform: translateX(4px);
+}
+
+.answer-btn.selected {
+  background: rgba(0, 245, 255, 0.1);
+  border-color: rgba(0, 245, 255, 0.6);
+}
+
+.answer-btn.correct {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.6);
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.2);
+}
+
+.answer-btn.wrong {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+}
+
+.answer-btn.eliminated {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* ===== TIMER ===== */
+.timer-normal {
+  color: #00f5ff;
+}
+.timer-warning {
+  color: #f59e0b;
+  animation: pulseNeon 0.5s ease-in-out infinite;
+}
+.timer-danger {
+  color: #ef4444;
+  animation: pulseNeon 0.25s ease-in-out infinite;
+}
+
+/* ===== PROGRESS BAR ===== */
+.progress-bar {
+  @apply h-1 rounded-full transition-all duration-1000;
+  background: linear-gradient(90deg, #00f5ff, #9333ea);
+  box-shadow: 0 0 8px rgba(0, 245, 255, 0.5);
+}
+
+/* ===== GRID BACKGROUND ===== */
+.bg-grid {
+  background-image: linear-gradient(rgba(0,245,255,0.025) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(0,245,255,0.025) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+/* ===== SCORE POP ===== */
+.score-pop {
+  animation: scorePop 0.8s ease-out forwards;
+}
+
+@keyframes scorePop {
+  0% { transform: translateY(0) scale(0.5); opacity: 1; }
+  60% { transform: translateY(-40px) scale(1.2); opacity: 1; }
+  100% { transform: translateY(-80px) scale(1); opacity: 0; }
+}
+
+/* ===== ROUND BADGE ===== */
+.round-badge {
+  @apply inline-flex items-center gap-2 px-4 py-1 rounded-full text-xs font-display font-bold tracking-widest uppercase;
+  background: rgba(0, 245, 255, 0.1);
+  border: 1px solid rgba(0, 245, 255, 0.3);
+  color: #00f5ff;
+}
+
+/* ===== LIFELINE BUTTONS ===== */
+.lifeline-btn {
+  @apply flex flex-col items-center gap-1 p-3 rounded-xl transition-all duration-200;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lifeline-btn:hover:not(:disabled) {
+  background: rgba(147, 51, 234, 0.08);
+  border-color: rgba(147, 51, 234, 0.4);
+}
+
+.lifeline-btn:disabled, .lifeline-btn.used {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ===== LEADERBOARD ===== */
+.rank-1 { background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,215,0,0.05)); border-color: rgba(255,215,0,0.4); }
+.rank-2 { background: linear-gradient(135deg, rgba(192,192,192,0.12), rgba(192,192,192,0.03)); border-color: rgba(192,192,192,0.3); }
+.rank-3 { background: linear-gradient(135deg, rgba(205,127,50,0.12), rgba(205,127,50,0.03)); border-color: rgba(205,127,50,0.3); }
+
+/* ===== PICTOGRAM ===== */
+.pictogram-display {
+  @apply text-6xl md:text-8xl text-center leading-none;
+  filter: drop-shadow(0 0 20px rgba(0, 245, 255, 0.3));
+}
+
+/* ===== HOST CONTROL ===== */
+.host-btn {
+  @apply px-4 py-2 rounded-lg font-display font-bold text-xs tracking-wider uppercase transition-all duration-200;
+}
+
+/* ===== FOCUS STATES ===== */
+*:focus-visible {
+  outline: 2px solid #00f5ff;
+  outline-offset: 2px;
+}
+
+/* ===== REDUCED MOTION ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ===== CUSTOM SCROLLBAR FOR PANELS ===== */
+.custom-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 245, 255, 0.3) transparent;
+}
+
+/* ===== CONFETTI CANVAS ===== */
+#confetti-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ===== PROJECTOR MODE ===== */
+.projector-mode {
+  background: #000;
+}
+
+.projector-mode .pictogram {
+  font-size: 12rem;
+  line-height: 1;
+}
+
+/* ===== SCAN LINE EFFECT ===== */
+.scanline::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0,245,255,0.5), transparent);
+  animation: scan 3s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes pulseNeon {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes scan {
+  0% { top: -2px; }
+  100% { top: 100%; }
+}
+
+/* ===== PARTICLES ===== */
+.particle {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.6;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: rgba(0, 245, 255, 0.4);
+  animation: particleFloat linear infinite;
+}
+
+@keyframes particleFloat {
+  0% { transform: translateY(100vh) translateX(0); opacity: 0; }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.6; }
+  100% { transform: translateY(-100px) translateX(20px); opacity: 0; }
+}
