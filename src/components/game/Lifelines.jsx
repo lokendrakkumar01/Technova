@@ -9,6 +9,8 @@ export default function Lifelines({
   onTechHint,
   onExtraTime,
   disabled = false,
+  showFiftyFifty = true,
+  showExtraTime = false,
 }) {
   const { fiftyFifty, techHint, extraTime } = lifelines;
 
@@ -25,7 +27,7 @@ export default function Lifelines({
     {
       id: 'techHint',
       name: `TECH HINT (${hintsRemaining})`,
-      desc: '-5 pts clue penalty',
+      desc: 'Reveals a clue',
       icon: <Sparkles className="w-4 h-4 text-purple-soft" />,
       used: techHint?.used || hintsRemaining <= 0,
       action: onTechHint,
@@ -40,7 +42,7 @@ export default function Lifelines({
       action: onExtraTime,
       accent: 'border-blue-bright/30 text-blue-bright hover:border-blue-bright',
     },
-  ];
+  ].filter((item) => item.id === 'techHint' || (item.id === 'fiftyFifty' && showFiftyFifty) || (item.id === 'extraTime' && showExtraTime));
 
   return (
     <div className="w-full">
@@ -53,7 +55,7 @@ export default function Lifelines({
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      <div className={`grid ${items.length === 1 ? 'grid-cols-1' : 'grid-cols-2'} gap-2 sm:gap-3`}>
         {items.map((item) => {
           const isButtonDisabled = disabled || item.used;
 
@@ -97,3 +99,4 @@ export default function Lifelines({
     </div>
   );
 }
+
