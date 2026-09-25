@@ -112,6 +112,16 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function requireHost(req, res, next) {
+  const token = req.get('x-host-token');
+  const session = token && adminSessions.get(token);
+  if (!session || session.role !== 'host' || session.expiresAt < Date.now()) {
+    if (token) adminSessions.delete(token);
+    return res.status(401).json({ error: 'Host session expired. Please sign in again.' });
+  }
+  next();
+}
+
 function issueSession(req, res, envName) {
   const configuredPin = process.env[envName];
   if (!configuredPin) return res.status(503).json({ error: envName + ' is not configured on the server.' });
@@ -229,6 +239,39 @@ app.get('/api/leaderboard', async (req, res) => {
 });
 
 app.delete('/api/admin/leaderboard/:id', requireAdmin, async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id || id.length > 160) return res.status(400).json({ error: 'A valid result ID is required.' });
+  try {
+    if (isMongoConnected && db) {
+      const result = await db.collection('leaderboard').deleteOne({ id });
+      return res.json({ success: true, deleted: result.deletedCount });
+    }
+    const previousLength = localLeaderboard.length;
+    localLeaderboard = localLeaderboard.filter((entry) => String(entry.id) !== id);
+    writeLocalData('leaderboard.json', localLeaderboard);
+    res.json({ success: true, deleted: previousLength - localLeaderboard.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/host/leaderboard', requireHost, async (req, res) => {
+  try {
+    if (isMongoConnected && db) {
+      const scores = await db.collection('leaderboard')
+        .find({ id: { $not: /^demo/i }, isDemo: { $ne: true } })
+        .sort({ score: -1 })
+        .limit(500)
+        .toArray();
+      return res.json(scores);
+    }
+    const scores = localLeaderboard
+      .filter((entry) => !entry?.isDemo && !/^demo/i.test(String(entry?.id || '')))
+      .sort((a, b) => Number(b.score) - Number(a.score))
+      .slice(0, 500);
+    res.json(scores);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/host/leaderboard/:id', requireHost, async (req, res) => {
   const id = String(req.params.id || '').trim();
   if (!id || id.length > 160) return res.status(400).json({ error: 'A valid result ID is required.' });
   try {
