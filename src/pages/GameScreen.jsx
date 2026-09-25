@@ -53,8 +53,7 @@ export default function GameScreen() {
     team,
     mode,
     gameStatus,
-    currentRound,
-    currentQuestionIndex,
+$1$2    pendingRound,$2$3
     phase,
     score,
     selectedAnswer,
@@ -367,6 +366,18 @@ export default function GameScreen() {
       </footer>
 
       {/* ─── OVERLAYS ──────────────────────────────────────────── */}
+      {gameStatus === 'roundApproval' && pendingRound && (
+        <div role="status" aria-live="polite" className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/95 p-5 text-center backdrop-blur-md">
+          <div className="w-full max-w-lg rounded-3xl border border-amber-300/25 bg-navy-900/90 p-8 shadow-2xl shadow-amber-950/30 sm:p-12">
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-300/30 bg-amber-300/10 text-2xl">✦</div>
+            <p className="text-xs font-mono tracking-[0.25em] text-amber-200/80">ROUND {currentRound} COMPLETE</p>
+            <h2 className="mt-3 font-display text-2xl font-black text-white sm:text-4xl">Waiting for host approval</h2>
+            <p className="mt-3 text-sm leading-6 text-white/60">Round {pendingRound} will begin after the host approves it.</p>
+            <div className="mt-7 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-mono text-white/55"><span className="h-2 w-2 animate-pulse rounded-full bg-amber-300" /> GAME PAUSED</div>
+          </div>
+        </div>
+      )}
+
       {/* Round Transition Screen */}
       <AnimatePresence>
         {gameStatus === 'roundTransition' && (
