@@ -243,9 +243,10 @@ export default function Registration() {
                 <div className="pt-4">
                   <button
                     type="submit"
-                    className="w-full btn-primary py-3.5 flex items-center justify-center gap-2 text-sm tracking-widest uppercase cursor-pointer"
+                    disabled={isRegistering}
+                    className="w-full btn-primary py-3.5 flex items-center justify-center gap-2 text-sm tracking-widest uppercase cursor-pointer disabled:opacity-60"
                   >
-                    <span>INITIALIZE CHALLENGER</span>
+                    <span>{isRegistering ? 'REGISTERING…' : 'INITIALIZE CHALLENGER'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -334,9 +335,10 @@ export default function Registration() {
                 <div className="pt-4">
                   <button
                     type="submit"
-                    className="w-full btn-primary py-3.5 flex items-center justify-center gap-2 text-sm tracking-widest uppercase cursor-pointer"
+                    disabled={isRegistering}
+                    className="w-full btn-primary py-3.5 flex items-center justify-center gap-2 text-sm tracking-widest uppercase cursor-pointer disabled:opacity-60"
                   >
-                    <span>INITIALIZE TEAM MATRIX</span>
+                    <span>{isRegistering ? 'REGISTERING…' : 'INITIALIZE TEAM MATRIX'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
