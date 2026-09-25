@@ -53,7 +53,9 @@ export default function GameScreen() {
     team,
     mode,
     gameStatus,
-$1$2    pendingRound,$2$3
+    currentRound,
+    pendingRound,
+    currentQuestionIndex,
     phase,
     score,
     selectedAnswer,
