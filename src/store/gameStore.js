@@ -80,10 +80,12 @@ const useGameStore = create(
       loadQuestionBank: async () => {
         try {
           const response = await fetch('/api/questions');
-          if (!response.ok) return;
+          if (!response.ok) return false;
           const questions = await response.json();
-          if (Array.isArray(questions) && questions.length > 0) set({ questionBank: questions });
-        } catch { /* The bundled question bank remains available when offline. */ }
+          if (!Array.isArray(questions)) return false;
+          set({ questionBank: questions.length > 0 ? questions : QUESTIONS });
+          return true;
+        } catch { return false; /* The bundled question bank remains available when offline. */ }
       },
       saveQuestionBank: async (questionBank, token) => {
         const response = await fetch('/api/questions', {
@@ -462,3 +464,4 @@ const useGameStore = create(
 );
 
 export default useGameStore;
+
