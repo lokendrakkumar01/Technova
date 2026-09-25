@@ -12,6 +12,7 @@ import {
   Trophy,
   Users,
   RefreshCw,
+  ExternalLink,
 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import useGameStore from '../store/gameStore';
@@ -43,6 +44,12 @@ export default function AdminPanel() {
   const [mediaTitle, setMediaTitle] = useState('');
   const [mediaDescription, setMediaDescription] = useState('');
   const [mediaStatus, setMediaStatus] = useState('');
+  const [memories, setMemories] = useState([]);
+  const [memoriesLoading, setMemoriesLoading] = useState(false);
+  const [memoriesError, setMemoriesError] = useState('');
+  const [editingMemory, setEditingMemory] = useState(null);
+  const [memoryForm, setMemoryForm] = useState(null);
+  const [memoryReplacementFile, setMemoryReplacementFile] = useState(null);
   const [leaderboardEntries, setLeaderboardEntries] = useState([]);
   const [leaderboardStatus, setLeaderboardStatus] = useState('');
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
@@ -71,6 +78,7 @@ export default function AdminPanel() {
       setAdminToken(result.token);
       setIsAuthenticated(true);
       void refreshLeaderboard(result.token);
+      void refreshMemories();
       const loaded = await loadQuestionBank();
       if (!loaded) setQuestionBankStatus('Could not refresh saved questions from the server. Check the connection and retry.');
       fetch('/api/health', { cache: 'no-store' })
@@ -92,6 +100,73 @@ export default function AdminPanel() {
       setLeaderboardStatus(error.message || 'Could not load saved results.');
     } finally { setLeaderboardLoading(false); }
     return token;
+  };
+
+  const refreshMemories = async () => {
+    setMemoriesLoading(true);
+    setMemoriesError('');
+    try {
+      const response = await fetch('/api/memories', { cache: 'no-store' });
+      const entries = await response.json();
+      if (!response.ok || !Array.isArray(entries)) throw new Error(entries.error || 'Could not load the memory gallery.');
+      setMemories(entries);
+    } catch (error) {
+      setMemoriesError(error.message || 'Could not load the memory gallery.');
+    } finally { setMemoriesLoading(false); }
+  };
+
+  const startEditMemory = (memory) => {
+    setEditingMemory(memory);
+    setMemoryReplacementFile(null);
+    setMemoryForm({
+      title: memory.title || '',
+      description: memory.description || '',
+      eventTag: memory.eventTag || '',
+      author: memory.author || '',
+      url: memory.url || '',
+    });
+  };
+
+  const saveMemoryEdit = async (event) => {
+    event.preventDefault();
+    if (!editingMemory || !memoryForm) return;
+    setMediaStatus('');
+    try {
+      const hasNewFile = memoryReplacementFile && ['photo', 'video'].includes(editingMemory.type);
+      let body = JSON.stringify(memoryForm);
+      const headers = { 'Content-Type': 'application/json', 'x-admin-token': adminToken };
+      if (hasNewFile) {
+        body = new FormData();
+        Object.entries(memoryForm).forEach(([key, value]) => body.append(key, value));
+        body.append('media', memoryReplacementFile);
+        delete headers['Content-Type'];
+      }
+      const response = await fetch(`/api/memories/${encodeURIComponent(editingMemory.id || editingMemory._id)}`, {
+        method: 'PUT', headers, body,
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not update this memory.');
+      setMemories((items) => items.map((item) => String(item.id || item._id) === String(editingMemory.id || editingMemory._id) ? result : item));
+      setEditingMemory(null);
+      setMemoryForm(null);
+      setMemoryReplacementFile(null);
+      setMediaStatus('Memory updated. Changes are live in the public gallery.');
+    } catch (error) { setMediaStatus(error.message || 'Could not update this memory.'); }
+  };
+
+  const deleteMemory = async (memory) => {
+    if (!window.confirm(`Delete “${memory.title || 'this memory'}” from the public gallery?`)) return;
+    setMediaStatus('');
+    try {
+      const response = await fetch(`/api/memories/${encodeURIComponent(memory.id || memory._id)}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-token': adminToken },
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not delete this memory.');
+      setMemories((items) => items.filter((item) => String(item.id || item._id) !== String(memory.id || memory._id)));
+      setMediaStatus('Memory deleted from the public gallery.');
+    } catch (error) { setMediaStatus(error.message || 'Could not delete this memory.'); }
   };
 
   const deleteLeaderboardEntry = async (entry) => {
@@ -196,6 +271,7 @@ export default function AdminPanel() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Could not save media.');
       setMediaStatus('Saved. It is now available in the Memories gallery.');
+      setMemories((items) => [result, ...items.filter((item) => String(item.id || item._id) !== String(result.id || result._id))]);
       setMediaFile(null); setMediaUrl(''); setMediaTitle(''); setMediaDescription('');
     } catch (error) { setMediaStatus(error.message); }
   };
@@ -329,17 +405,70 @@ export default function AdminPanel() {
         {durableStorage === true && <div role="status" className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 p-3 text-xs text-emerald-100">Shared MongoDB storage is connected. Admin changes and completed scores are saved centrally.</div>}
         {questionBankStatus && <p role="status" className="text-xs text-cyan-neon">{questionBankStatus}</p>}
 
-        <section className="rounded-xl border border-white/10 bg-navy-900/70 p-4 sm:p-6 space-y-4">
-          <div><h2 className="font-display text-lg font-bold text-white">MEMORIES MEDIA</h2><p className="text-xs text-white/50">Upload photos, videos, YouTube clips, or external links. Saved items appear in the public gallery.</p></div>
-          <form onSubmit={handleMediaSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-            <label className="text-xs text-white/60">Type<select value={mediaType} onChange={(e) => setMediaType(e.target.value)} className="mt-1 w-full p-2 rounded bg-navy-950 border border-white/15 text-white"><option value="photo">Photo</option><option value="video">Video</option><option value="youtube">YouTube link</option><option value="link">External link</option></select></label>
-            {(mediaType === 'photo' || mediaType === 'video') ? <label className="text-xs text-white/60">Media file<input required type="file" accept={mediaType === 'photo' ? 'image/*' : 'video/*'} onChange={(e) => setMediaFile(e.target.files?.[0] || null)} className="mt-1 w-full text-xs text-white" /></label> : <label className="text-xs text-white/60">Link URL<input required type="url" value={mediaUrl} onChange={(e) => setMediaUrl(e.target.value)} placeholder="https://..." className="mt-1 w-full p-2 rounded bg-navy-950 border border-white/15 text-white" /></label>}
-            <label className="text-xs text-white/60">Title<input value={mediaTitle} onChange={(e) => setMediaTitle(e.target.value)} className="mt-1 w-full p-2 rounded bg-navy-950 border border-white/15 text-white" /></label>
-            <label className="text-xs text-white/60">Description<input value={mediaDescription} onChange={(e) => setMediaDescription(e.target.value)} className="mt-1 w-full p-2 rounded bg-navy-950 border border-white/15 text-white" /></label>
-            <button type="submit" className="btn-primary p-2 text-xs font-bold">SAVE TO GALLERY</button>
+        <section className="rounded-2xl border border-white/10 bg-navy-900/70 overflow-hidden">
+          <div className="p-4 sm:p-6 border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-display text-lg sm:text-xl font-bold text-white">MEMORIES STUDIO</h2>
+              <p className="mt-1 text-xs text-white/50">Upload, edit, or remove photos, videos, and links shown in the public gallery.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-cyan-neon/20 bg-cyan-neon/10 px-3 py-1.5 text-[11px] font-mono text-cyan-neon">{memories.length} items</span>
+              <button type="button" onClick={() => void refreshMemories()} disabled={memoriesLoading} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70 hover:text-white disabled:opacity-50"><RefreshCw className={`w-3.5 h-3.5 ${memoriesLoading ? 'animate-spin' : ''}`} /><span className="hidden sm:inline">Refresh</span></button>
+            </div>
+          </div>
+
+          <form onSubmit={handleMediaSubmit} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 p-4 sm:p-6 items-end">
+            <label className="text-xs text-white/60">Media type<select value={mediaType} onChange={(e) => setMediaType(e.target.value)} className="mt-1 w-full min-h-11 p-2.5 rounded-lg bg-navy-950 border border-white/15 text-white"><option value="photo">Photo</option><option value="video">Video</option><option value="youtube">YouTube link</option><option value="link">External link</option></select></label>
+            {(mediaType === 'photo' || mediaType === 'video') ? <label className="text-xs text-white/60 sm:col-span-1 xl:col-span-2">Choose file<input required type="file" accept={mediaType === 'photo' ? 'image/*' : 'video/*'} onChange={(e) => setMediaFile(e.target.files?.[0] || null)} className="mt-1.5 block w-full min-h-11 text-xs text-white file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-neon/15 file:px-3 file:py-2 file:text-cyan-neon" /><span className="mt-1 block text-[10px] text-white/35">Maximum upload size: 50 MB</span></label> : <label className="text-xs text-white/60 sm:col-span-1 xl:col-span-2">Link URL<input required type="url" value={mediaUrl} onChange={(e) => setMediaUrl(e.target.value)} placeholder="https://..." className="mt-1 w-full min-h-11 p-2.5 rounded-lg bg-navy-950 border border-white/15 text-white" /></label>}
+            <label className="text-xs text-white/60">Title<input value={mediaTitle} onChange={(e) => setMediaTitle(e.target.value)} maxLength={120} className="mt-1 w-full min-h-11 p-2.5 rounded-lg bg-navy-950 border border-white/15 text-white" placeholder="Memory title" /></label>
+            <label className="text-xs text-white/60">Description<input value={mediaDescription} onChange={(e) => setMediaDescription(e.target.value)} maxLength={1000} className="mt-1 w-full min-h-11 p-2.5 rounded-lg bg-navy-950 border border-white/15 text-white" placeholder="Short description" /></label>
+            <button type="submit" className="btn-primary min-h-11 p-2.5 text-xs font-bold sm:col-span-2 xl:col-span-1">SAVE TO GALLERY</button>
           </form>
-          {mediaStatus && <p role="status" className="text-xs text-cyan-neon">{mediaStatus}</p>}
+
+          {mediaStatus && <p role="status" className="mx-4 mb-4 sm:mx-6 rounded-lg border border-cyan-neon/15 bg-cyan-neon/5 p-3 text-xs text-cyan-neon">{mediaStatus}</p>}
+          {memoriesError && <p role="alert" className="mx-4 mb-4 sm:mx-6 rounded-lg border border-rose-400/20 bg-rose-400/10 p-3 text-xs text-rose-200">{memoriesError}</p>}
+          {memoriesLoading && memories.length === 0 ? <p role="status" className="p-8 text-center text-sm text-white/45">Loading gallery items…</p> : memories.length === 0 ? <div className="border-t border-white/5 p-8 text-center"><p className="font-display text-white">No memories uploaded yet</p><p className="mt-1 text-xs text-white/45">Your saved photos, videos, and links will appear here for editing.</p></div> : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 border-t border-white/5 p-4 sm:p-6">
+              {memories.map((memory) => (
+                <article key={memory.id || memory._id || memory.url} className="min-w-0 overflow-hidden rounded-xl border border-white/10 bg-navy-950/70 hover:border-cyan-neon/30 transition-colors">
+                  <div className="relative aspect-video bg-black/50 flex items-center justify-center overflow-hidden">
+                    {memory.type === 'photo' && <img src={memory.url} alt={memory.title || 'Uploaded memory'} loading="lazy" className="h-full w-full object-cover" />}
+                    {memory.type === 'video' && <video src={memory.url} controls preload="metadata" className="h-full w-full object-contain" />}
+                    {memory.type === 'youtube' && <iframe src={`https://www.youtube-nocookie.com/embed/${memory.youtubeId}`} title={memory.title || 'YouTube memory'} loading="lazy" className="h-full w-full border-0" allowFullScreen />}
+                    {memory.type === 'link' && <a href={memory.url} target="_blank" rel="noreferrer" className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center text-cyan-neon"><ExternalLink className="h-6 w-6" /><span className="break-all text-xs">{memory.url}</span></a>}
+                    <span className="absolute left-3 top-3 rounded-full border border-white/15 bg-black/65 px-2.5 py-1 text-[10px] uppercase tracking-wider text-white/80">{memory.type}</span>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate font-display font-bold text-sm text-white">{memory.title || 'Untitled memory'}</h3><p className="mt-1 line-clamp-2 min-h-8 text-xs text-white/50">{memory.description || 'No description'}</p></div><span className="shrink-0 text-[10px] text-white/35">{memory.createdAt ? new Date(memory.createdAt).toLocaleDateString() : ''}</span></div>
+                    <div className="mt-4 flex gap-2 border-t border-white/5 pt-3">
+                      <button type="button" onClick={() => startEditMemory(memory)} className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-cyan-neon/20 bg-cyan-neon/5 text-xs font-semibold text-cyan-neon hover:bg-cyan-neon/10"><Edit className="h-3.5 w-3.5" /> Edit</button>
+                      <button type="button" onClick={() => void deleteMemory(memory)} className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-rose-400/20 bg-rose-400/5 text-xs font-semibold text-rose-300 hover:bg-rose-400/10"><Trash2 className="h-3.5 w-3.5" /> Delete</button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
+
+        {editingMemory && memoryForm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 p-3 sm:p-5 backdrop-blur-sm">
+            <form onSubmit={saveMemoryEdit} className="my-4 w-full max-w-xl space-y-4 rounded-2xl border border-white/15 bg-navy-950 p-4 sm:p-6 shadow-2xl">
+              <div className="flex items-start justify-between gap-4"><div><h2 className="font-display text-lg font-bold text-white">EDIT MEMORY</h2><p className="mt-1 text-xs text-white/45">Updates appear in the public gallery immediately.</p></div><button type="button" onClick={() => { setEditingMemory(null); setMemoryForm(null); setMemoryReplacementFile(null); }} className="rounded-lg p-2 text-white/50 hover:bg-white/10 hover:text-white" aria-label="Close editor">✕</button></div>
+              <div className="space-y-3">
+                <label className="block text-xs text-white/60">Title<input required maxLength={120} value={memoryForm.title} onChange={(event) => setMemoryForm({ ...memoryForm, title: event.target.value })} className="mt-1 w-full min-h-11 rounded-lg border border-white/15 bg-navy-900 p-3 text-white" /></label>
+                <label className="block text-xs text-white/60">Description<textarea rows={3} maxLength={1000} value={memoryForm.description} onChange={(event) => setMemoryForm({ ...memoryForm, description: event.target.value })} className="mt-1 w-full rounded-lg border border-white/15 bg-navy-900 p-3 text-white" /></label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="block text-xs text-white/60">Event tag<input maxLength={80} value={memoryForm.eventTag} onChange={(event) => setMemoryForm({ ...memoryForm, eventTag: event.target.value })} className="mt-1 w-full min-h-11 rounded-lg border border-white/15 bg-navy-900 p-3 text-white" /></label>
+                  <label className="block text-xs text-white/60">Credit / author<input maxLength={80} value={memoryForm.author} onChange={(event) => setMemoryForm({ ...memoryForm, author: event.target.value })} className="mt-1 w-full min-h-11 rounded-lg border border-white/15 bg-navy-900 p-3 text-white" /></label>
+                </div>
+                {['photo', 'video'].includes(editingMemory.type) && <label className="block text-xs text-white/60">Replace media file (optional)<input type="file" accept={editingMemory.type === 'photo' ? 'image/*' : 'video/*'} onChange={(event) => setMemoryReplacementFile(event.target.files?.[0] || null)} className="mt-1.5 block w-full min-h-11 text-xs text-white file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-neon/15 file:px-3 file:py-2 file:text-cyan-neon" /></label>}
+                {['link', 'youtube'].includes(editingMemory.type) && <label className="block text-xs text-white/60">Link URL<input required type="url" value={memoryForm.url} onChange={(event) => setMemoryForm({ ...memoryForm, url: event.target.value })} className="mt-1 w-full min-h-11 rounded-lg border border-white/15 bg-navy-900 p-3 text-white" /></label>}
+              </div>
+              <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2"><button type="button" onClick={() => { setEditingMemory(null); setMemoryForm(null); setMemoryReplacementFile(null); }} className="min-h-11 flex-1 rounded-lg border border-white/15 text-sm text-white/70">Cancel</button><button type="submit" className="btn-primary min-h-11 flex-1 text-sm font-bold">Save changes</button></div>
+            </form>
+          </div>
+        )}
 
         <section className="rounded-xl border border-white/10 bg-navy-900/70 overflow-hidden">
           <div className="p-4 sm:p-5 border-b border-white/10 flex flex-wrap items-center justify-between gap-3">

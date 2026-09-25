@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Download,
@@ -9,6 +9,7 @@ import {
   ExternalLink,
   Film,
   Image as ImageIcon,
+  RefreshCw,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
@@ -24,17 +25,41 @@ export default function Memories() {
   const [memories, setMemories] = useState([]);
   const [filter, setFilter] = useState('all');
   const [lightboxItem, setLightboxItem] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
-  // Fetch from backend API if available
-  useEffect(() => {
-    const baseUrl = import.meta.env.VITE_API_URL || '';
-    fetch(`${baseUrl}/api/memories`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => { if (Array.isArray(data)) setMemories(data); })
-      .catch(() => {
-        // Fallback to local state
-      });
+  const loadMemories = useCallback(async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${baseUrl}/api/memories`, { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok || !Array.isArray(data)) throw new Error(data.error || 'Could not load the memories gallery.');
+      setMemories(data);
+      setLoadError('');
+    } catch (error) {
+      setLoadError(error.message || 'Could not connect to the memories gallery.');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadMemories();
+    const timer = window.setInterval(() => void loadMemories(), 30000);
+    const refreshOnReturn = () => { if (document.visibilityState === 'visible') void loadMemories(); };
+    document.addEventListener('visibilitychange', refreshOnReturn);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshOnReturn);
+    };
+  }, [loadMemories]);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    void loadMemories();
+  };
 
   const handleDownloadDesktopPack = () => {
     const summary = {
@@ -86,11 +111,21 @@ export default function Memories() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex w-full sm:w-auto flex-wrap items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-2.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-white text-xs font-mono flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+              aria-label="Refresh memories"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">REFRESH</span>
+            </button>
             <button
               type="button"
               onClick={() => navigate('/admin')}
-              className="btn-primary py-2.5 px-4 text-xs flex items-center gap-2 cursor-pointer shadow-neon-cyan"
+              className="btn-primary min-h-10 flex-1 sm:flex-none py-2.5 px-4 text-xs flex items-center justify-center gap-2 cursor-pointer shadow-neon-cyan"
             >
               <Plus className="w-4 h-4" />
               ADMIN UPLOAD
@@ -99,7 +134,7 @@ export default function Memories() {
             <button
               type="button"
               onClick={handleDownloadDesktopPack}
-              className="p-2.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-white text-xs font-mono flex items-center gap-2 cursor-pointer transition-all"
+              className="min-h-10 flex-1 sm:flex-none p-2.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-white text-xs font-mono flex items-center justify-center gap-2 cursor-pointer transition-all"
               title="Download Desktop Pack"
             >
               <Download className="w-4 h-4" />
@@ -146,6 +181,9 @@ export default function Memories() {
             );
           })}
         </div>
+
+        {loadError && <div role="alert" className="rounded-xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm text-rose-200">{loadError} <button type="button" onClick={handleRefresh} className="ml-2 underline underline-offset-4">Retry</button></div>}
+        {isLoading && <div role="status" className="rounded-xl border border-white/10 bg-navy-900/70 p-10 text-center text-sm text-white/50">Loading the memories archive…</div>}
 
         {/* Media Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -236,7 +274,7 @@ export default function Memories() {
             </motion.div>
           ))}
         </div>
-        {filtered.length === 0 && <div className="rounded-2xl border border-dashed border-white/15 p-10 text-center text-sm text-white/50">No real media has been added yet. Admin uploads will appear here.</div>}
+        {!isLoading && !loadError && filtered.length === 0 && <div className="rounded-2xl border border-dashed border-white/15 p-10 text-center text-sm text-white/50">No real media has been added yet. Admin uploads will appear here.</div>}
 
         {/* Lightbox Modal */}
         {lightboxItem && (
@@ -270,3 +308,4 @@ export default function Memories() {
     </Layout>
   );
 }
+

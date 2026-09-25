@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const crypto = require('crypto');
 const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
@@ -40,6 +40,11 @@ const writeLocalData = (name, value) => {
 let localLeaderboard = readLocalData('leaderboard.json');
 let localParticipants = readLocalData('participants.json');
 let localMemories = readLocalData('memories.json');
+const publicMemoryId = (item) => String(item.id || item._id || crypto.createHash('sha256').update(`${item.url || ''}:${item.createdAt || ''}`).digest('hex').slice(0, 24));
+const memoryIdFilter = (id) => ({ $or: [
+  { id },
+  ...(/^[a-f\d]{24}$/i.test(id) ? [{ _id: new ObjectId(id) }] : []),
+] });
 
 // ─── 1. MONGODB CLIENT CONFIGURATION ──────────────────────────────────────────
 const mongoUri = process.env.MONGODB_URI;
@@ -272,12 +277,118 @@ app.get('/api/memories', async (req, res) => {
         .find()
         .sort({ createdAt: -1 })
         .toArray();
-      return res.json(list);
+      return res.json(list.map((item) => ({ ...item, id: publicMemoryId(item) })));
     }
-    res.json(localMemories.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+    res.json(localMemories.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((item) => ({ ...item, id: publicMemoryId(item) })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+app.put('/api/memories/:id', requireAdmin, upload.single('media'), async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id || id.length > 160) return res.status(400).json({ error: 'A valid memory ID is required.' });
+  const { title, description, eventTag, author, url } = req.body || {};
+  if (typeof title !== 'string' || !title.trim()) return res.status(400).json({ error: 'A title is required.' });
+  try {
+    let current;
+    if (isMongoConnected && db) {
+      current = await db.collection('memories').findOne(memoryIdFilter(id));
+    } else {
+      current = localMemories.find((item) => publicMemoryId(item) === id);
+    }
+    if (!current) return res.status(404).json({ error: 'Memory was not found.' });
+
+    const update = {
+      title: title.trim().slice(0, 120),
+      description: typeof description === 'string' ? description.trim().slice(0, 1000) : '',
+      eventTag: typeof eventTag === 'string' ? eventTag.trim().slice(0, 80) : '',
+      author: typeof author === 'string' ? author.trim().slice(0, 80) : '',
+      updatedAt: new Date(),
+    };
+    if (req.file) {
+      const expectedType = current.type === 'video' ? 'video/' : 'image/';
+      if (!['photo', 'video'].includes(current.type) || !req.file.mimetype.startsWith(expectedType)) {
+        fs.unlink(req.file.path, () => {});
+        return res.status(400).json({ error: 'Replacement file must match the memory media type.' });
+      }
+      update.url = `/uploads/${req.file.filename}`;
+      update.isCloudinary = false;
+      update.cloudinaryPublicId = null;
+      const cloudinaryConfigured = process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET;
+      if (cloudinaryConfigured) {
+        try {
+          const cloudRes = await cloudinary.uploader.upload(req.file.path, {
+            resource_type: current.type === 'video' ? 'video' : 'image',
+            folder: 'techdecode_memories',
+          });
+          if (cloudRes?.secure_url) {
+            update.url = cloudRes.secure_url;
+            update.isCloudinary = true;
+            update.cloudinaryPublicId = cloudRes.public_id || null;
+            fs.unlink(req.file.path, () => {});
+          }
+        } catch (cloudErr) { console.warn('Cloudinary replacement fallback to local storage:', cloudErr.message); }
+      }
+    }
+    if (url !== undefined && ['link', 'youtube'].includes(current.type)) {
+      let parsed;
+      try { parsed = new URL(String(url)); } catch { return res.status(400).json({ error: 'Enter a valid HTTP or HTTPS link.' }); }
+      if (!['http:', 'https:'].includes(parsed.protocol)) return res.status(400).json({ error: 'Only HTTP and HTTPS links are supported.' });
+      update.url = parsed.toString();
+      if (current.type === 'youtube') {
+        const youtubeId = extractYoutubeId(update.url);
+        if (!youtubeId) return res.status(400).json({ error: 'Enter a valid YouTube link.' });
+        update.youtubeId = youtubeId;
+      }
+    }
+
+    let saved;
+    if (isMongoConnected && db) {
+      await db.collection('memories').updateOne(memoryIdFilter(id), { $set: update });
+      saved = { ...current, ...update, id };
+    } else {
+      saved = { ...current, ...update, id };
+      localMemories = localMemories.map((item) => publicMemoryId(item) === id ? saved : item);
+      writeLocalData('memories.json', localMemories);
+    }
+    if (req.file && current.url !== update.url && typeof current.url === 'string' && current.url.startsWith('/uploads/')) {
+      fs.unlink(path.join(uploadDir, path.basename(current.url)), () => {});
+    }
+    if (req.file && current.isCloudinary && current.cloudinaryPublicId) {
+      void cloudinary.uploader.destroy(current.cloudinaryPublicId, { resource_type: current.type === 'video' ? 'video' : 'image' }).catch(() => {});
+    }
+    res.json(saved);
+  } catch (err) {
+    if (req.file?.path) fs.unlink(req.file.path, () => {});
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/memories/:id', requireAdmin, async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id || id.length > 160) return res.status(400).json({ error: 'A valid memory ID is required.' });
+  try {
+    let removed;
+    if (isMongoConnected && db) {
+      removed = await db.collection('memories').findOne(memoryIdFilter(id));
+      if (!removed) return res.status(404).json({ error: 'Memory was not found.' });
+      await db.collection('memories').deleteOne(memoryIdFilter(id));
+    } else {
+      removed = localMemories.find((item) => publicMemoryId(item) === id);
+      if (!removed) return res.status(404).json({ error: 'Memory was not found.' });
+      localMemories = localMemories.filter((item) => publicMemoryId(item) !== id);
+      writeLocalData('memories.json', localMemories);
+    }
+    if (typeof removed.url === 'string' && removed.url.startsWith('/uploads/')) {
+      const filePath = path.join(uploadDir, path.basename(removed.url));
+      fs.unlink(filePath, () => {});
+    }
+    if (removed.isCloudinary && removed.cloudinaryPublicId) {
+      void cloudinary.uploader.destroy(removed.cloudinaryPublicId, { resource_type: removed.type === 'video' ? 'video' : 'image' }).catch(() => {});
+    }
+    res.json({ success: true, id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/memories/upload', requireAdmin, upload.single('media'), async (req, res) => {
@@ -294,21 +405,24 @@ app.post('/api/memories/upload', requireAdmin, upload.single('media'), async (re
     if (!allowedMime) { fs.unlink(file.path, () => {}); return res.status(400).json({ error: 'Uploaded file does not match the selected media type.' }); }
     let finalUrl = `/uploads/${file.filename}`;
     let isCloudinary = false;
+    let cloudinaryPublicId = null;
     const cloudinaryConfigured = process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET;
     if (cloudinaryConfigured) {
       try {
         const resourceType = type === 'video' ? 'video' : 'image';
         const cloudRes = await cloudinary.uploader.upload(file.path, { resource_type: resourceType, folder: 'techdecode_memories' });
-        if (cloudRes?.secure_url) { finalUrl = cloudRes.secure_url; isCloudinary = true; fs.unlink(file.path, () => {}); }
+        if (cloudRes?.secure_url) { finalUrl = cloudRes.secure_url; isCloudinary = true; cloudinaryPublicId = cloudRes.public_id || null; fs.unlink(file.path, () => {}); }
       } catch (cloudErr) { console.warn('Cloudinary upload fallback to local storage:', cloudErr.message); }
     }
 
     const memoryItem = {
+      id: crypto.randomUUID(),
       type: type || 'photo',
       title: title || 'Fest Moment',
       description: description || '',
       url: finalUrl,
       isCloudinary,
+      cloudinaryPublicId,
       eventTag: eventTag || 'Fest Highlight',
       author: author || 'Fest Reporter',
       createdAt: new Date(),
@@ -339,6 +453,7 @@ app.post('/api/memories/youtube', requireAdmin, async (req, res) => {
     }
 
     const item = {
+      id: crypto.randomUUID(),
       type: 'youtube',
       title: title || 'TECHDECODE YouTube Recap',
       description: description || '',
@@ -369,7 +484,7 @@ app.post('/api/memories/link', requireAdmin, async (req, res) => {
     let parsed;
     try { parsed = new URL(url); } catch { return res.status(400).json({ error: 'Enter a valid link.' }); }
     if (!['http:', 'https:'].includes(parsed.protocol)) return res.status(400).json({ error: 'Only HTTP and HTTPS links are supported.' });
-    const item = { type: 'link', title: title || parsed.hostname, description: description || '', url: parsed.toString(), eventTag: eventTag || 'Highlight', author: author || 'Admin', createdAt: new Date() };
+    const item = { id: crypto.randomUUID(), type: 'link', title: title || parsed.hostname, description: description || '', url: parsed.toString(), eventTag: eventTag || 'Highlight', author: author || 'Admin', createdAt: new Date() };
     if (isMongoConnected && db) { const result = await db.collection('memories').insertOne(item); item._id = result.insertedId; }
     else { localMemories.unshift(item); writeLocalData('memories.json', localMemories); }
     res.status(201).json(item);
