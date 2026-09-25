@@ -212,7 +212,7 @@ $1$2    hostApproveRound,$2    hostSkipQuestion,
                   <p className="font-display text-sm font-bold text-amber-200">ROUND {pendingRound} IS READY FOR APPROVAL</p>
                   <p className="mt-1 text-xs text-white/55">Participants remain paused until the host approves the next round.</p>
                 </div>
-                <button type="button" onClick={hostApproveRound} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-400 px-4 py-2 font-display text-xs font-black tracking-wider text-slate-950 transition hover:bg-emerald-300">
+                <button type="button" onClick={() => { hostApproveRound(); navigate('/game'); }} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-400 px-4 py-2 font-display text-xs font-black tracking-wider text-slate-950 transition hover:bg-emerald-300">
                   <BadgeCheck className="h-4 w-4" /> APPROVE ROUND {pendingRound}
                 </button>
               </div>
