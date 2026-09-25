@@ -376,7 +376,6 @@ export default function GameScreen() {
             <h2 className="mt-3 font-display text-2xl font-black text-white sm:text-4xl">Waiting for host approval</h2>
             <p className="mt-3 text-sm leading-6 text-white/60">Round {pendingRound} will begin after the host approves it.</p>
             <div className="mt-7 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-mono text-white/55"><span className="h-2 w-2 animate-pulse rounded-full bg-amber-300" /> GAME PAUSED</div>
-            <button type="button" onClick={() => navigate('/host')} className="mt-6 block min-h-11 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-xs font-display font-bold tracking-wider text-white/75 transition hover:border-cyan-neon/40 hover:text-cyan-neon">OPEN HOST CONSOLE</button>
           </div>
         </div>
       )}
