@@ -13,7 +13,9 @@ const initialState = {
 
   // Game status
   gameStatus: 'idle', // idle | registration | ready | playing | roundApproval | roundTransition | showdown | finished | paused
-$1$2  pendingRound: null,$2$3 0, // 0-based index within the full QUESTIONS array
+  currentRound: 1,
+  pendingRound: null,
+  currentQuestionIndex: 0, // 0-based index within the full QUESTIONS array
   phase: 'question', // 'question' | 'reveal' | 'roundEnd'
 
   // Scoring
@@ -145,7 +147,9 @@ const useGameStore = create(
       // ─── GAME FLOW ───────────────────────────────────────────────────────
       startGame: () => set({
         gameStatus: 'roundTransition',
-$1$2        pendingRound: null,$2$3 0,
+        currentRound: 1,
+        pendingRound: null,
+        currentQuestionIndex: 0,
         score: 0,
         correctAnswers: 0,
         wrongAnswers: 0,
