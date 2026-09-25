@@ -26,6 +26,8 @@ export default function HostDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
+  const [isStartingGame, setIsStartingGame] = useState(false);
+  const [questionLoadError, setQuestionLoadError] = useState('');
 
   // Score adjust state
   const [pointsInput, setPointsInput] = useState(10);
@@ -52,7 +54,21 @@ export default function HostDashboard() {
     hostAddPoints,
     hostRemovePoints,
     hostResetScore,
+    loadQuestionBank,
   } = useGameStore();
+
+  const handleStartGame = async () => {
+    setIsStartingGame(true);
+    setQuestionLoadError('');
+    const loaded = await loadQuestionBank();
+    if (!loaded) {
+      setQuestionLoadError('Could not load the latest admin question bank. Check the connection and retry.');
+      setIsStartingGame(false);
+      return;
+    }
+    startGame();
+    navigate('/game');
+  };
 
   const handlePinSubmit = async (e) => {
     e.preventDefault();
@@ -81,21 +97,21 @@ export default function HostDashboard() {
               HOST AUTHORIZATION
             </h1>
             <p className="text-xs font-mono text-white/50 mb-6">
-              ENTER EVENT DIRECTOR PASSCODE
+              Configure your private HOST_PIN in Render → Environment.
             </p>
 
             <form onSubmit={handlePinSubmit} className="space-y-4">
               <div>
                 <input
                   type="password"
-                  maxLength={6}
+                  maxLength={128}
                   value={pin}
                   onChange={(e) => {
                     setPin(e.target.value);
                     setPinError(false);
                   }}
-                  placeholder="Host passcode"
-                  className="w-full px-4 py-3 text-center tracking-[0.5em] font-mono text-lg rounded-xl bg-navy-950/80 border border-white/15 text-white placeholder-white/20 focus:outline-none focus:border-cyan-neon"
+                  placeholder="Host passphrase"
+                  className="w-full px-4 py-3 text-center tracking-widest font-mono text-lg rounded-xl bg-navy-950/80 border border-white/15 text-white placeholder-white/20 focus:outline-none focus:border-cyan-neon"
                 />
                 {pinError && (
                   <p className="text-xs text-rose-400 mt-2 font-mono">
@@ -197,14 +213,12 @@ export default function HostDashboard() {
               {/* Start Game */}
               <button
                 type="button"
-                onClick={() => {
-                  startGame();
-                  navigate('/game');
-                }}
-                className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-display font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer"
+                onClick={() => void handleStartGame()}
+                disabled={isStartingGame}
+                className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-display font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
               >
                 <Play className="w-5 h-5 fill-current" />
-                START GAME
+                {isStartingGame ? 'LOADING QUESTIONS…' : 'START GAME'}
               </button>
 
               {/* Pause / Resume */}
@@ -281,6 +295,7 @@ export default function HostDashboard() {
                 END CONTEST
               </button>
             </div>
+            {questionLoadError && <p role="alert" className="text-xs text-rose-300">{questionLoadError}</p>}
           </div>
 
           {/* Points & Score Override (1 Column) */}
@@ -432,3 +447,4 @@ export default function HostDashboard() {
     </Layout>
   );
 }
+
