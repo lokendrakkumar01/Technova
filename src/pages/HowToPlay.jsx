@@ -149,7 +149,7 @@ export default function HowToPlay() {
         {/* ── Hero heading ── */}
         <motion.div {...fadeUp(0.05)} className="text-center mb-14">
           <p className="text-xs tracking-[0.35em] font-bold text-cyan-400/70 uppercase mb-3">
-            ⚡ TECHNOVA 2026
+            ⚡ TECHDECODE 2026
           </p>
           <h1
             className="text-4xl md:text-6xl font-black tracking-wider mb-3"
@@ -162,7 +162,7 @@ export default function HowToPlay() {
             HOW TO PLAY
           </h1>
           <p className="text-slate-400 text-sm md:text-base max-w-xl mx-auto">
-            Everything you need to know before diving into the TECHNOVA challenge
+            Everything you need to know before diving into the TECHDECODE challenge
           </p>
         </motion.div>
 
@@ -358,7 +358,7 @@ export default function HowToPlay() {
         </motion.div>
 
         <p className="text-center text-xs text-slate-700 mt-8 mb-4">
-          TECHNOVA 2026 &nbsp;·&nbsp; College Tech Fest &nbsp;·&nbsp; All rights reserved
+          TECHDECODE 2026 &nbsp;·&nbsp; College Tech Fest &nbsp;·&nbsp; All rights reserved
         </p>
       </div>
     </div>

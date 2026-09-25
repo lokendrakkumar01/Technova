@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, Users, ArrowLeft, ArrowRight, ShieldAlert, Sparkles, CheckCircle2 } from 'lucide-react';
+import { User, Users, ArrowLeft, ArrowRight, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import useGameStore from '../store/gameStore';
 
 export default function Registration() {
   const navigate = useNavigate();
-  const { mode, registerPlayer, registerTeam } = useGameStore();
+  const { mode, registerPlayer, registerTeam, playerCode } = useGameStore();
 
   // If no mode selected yet, fallback to individual or let them choose
   const currentMode = mode || 'individual';
@@ -66,7 +66,7 @@ export default function Registration() {
       ...individualData,
     });
 
-    setRegisteredCode('IND-' + Math.random().toString(36).substring(2, 7).toUpperCase());
+    setRegisteredCode(true);
     setTimeout(() => {
       navigate('/ready');
     }, 900);
@@ -99,7 +99,7 @@ export default function Registration() {
       ...teamData,
     });
 
-    setRegisteredCode('TEAM-' + Math.random().toString(36).substring(2, 7).toUpperCase());
+    setRegisteredCode(true);
     setTimeout(() => {
       navigate('/ready');
     }, 900);
@@ -171,7 +171,7 @@ export default function Registration() {
                 <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto animate-bounce" />
                 <h2 className="font-display text-2xl font-bold text-white">ACCESS GRANTED</h2>
                 <p className="text-sm font-mono text-cyan-neon">
-                  YOUR ACCESS CODE: <span className="font-bold text-white text-lg">{registeredCode}</span>
+                  YOUR ACCESS CODE: <span className="font-bold text-white text-lg">{playerCode}</span>
                 </p>
                 <div className="text-xs text-white/60">Initializing Tech Matrix...</div>
               </motion.div>
@@ -247,7 +247,7 @@ export default function Registration() {
                       required
                       value={teamData.teamName}
                       onChange={(e) => setTeamData({ ...teamData, teamName: e.target.value })}
-                      placeholder="e.g. Binary Beasts"
+                      placeholder="e.g. Team Delta"
                       className="w-full px-4 py-3 rounded-xl bg-navy-950/70 border border-white/15 text-white placeholder-white/30 text-sm focus:outline-none focus:border-purple-soft transition-all"
                     />
                     {errors.teamName && (

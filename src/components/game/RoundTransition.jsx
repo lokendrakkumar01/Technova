@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, ShieldCheck } from 'lucide-react';
+import { Zap } from 'lucide-react';
 
 export default function RoundTransition({
   roundNumber = 1,
@@ -73,7 +73,7 @@ export default function RoundTransition({
             >
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-cyan-neon/40 bg-cyan-neon/10 text-cyan-neon text-xs font-display tracking-widest uppercase">
                 <Zap className="w-3.5 h-3.5 text-cyan-neon animate-pulse" />
-                Technova Protocol Initiated
+                TECHDECODE Protocol Initiated
               </div>
 
               <h1 className="font-display font-black text-5xl sm:text-7xl tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-neon to-purple-soft drop-shadow-[0_0_35px_rgba(0,245,255,0.4)]">

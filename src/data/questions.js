@@ -1,4 +1,4 @@
-// All 30 main questions + 5 final showdown questions for TECHNOVA
+// All 30 main questions + 5 final showdown questions for TECHDECODE
 
 export const ROUNDS = [
   { id: 1, name: 'CODE LANGUAGE', tagline: 'Know your languages.', color: 'cyan', questions: [1, 10] },

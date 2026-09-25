@@ -37,7 +37,7 @@ const FEATURES = [
     icon: '⚡',
     title: 'FINAL SHOWDOWN',
     description:
-      'The last survivors face a sudden-death lightning round. One wrong answer and you\'re out. Only the sharpest minds claim the TECHNOVA crown.',
+      'The last survivors face a sudden-death lightning round. One wrong answer and you\'re out. Only the sharpest minds claim the TECHDECODE crown.',
     accent: '#f59e0b',
   },
 ];
@@ -286,7 +286,7 @@ export default function LandingPage() {
               wordBreak: 'break-word',
             }}
           >
-            TECHNOVA
+            TECHDECODE
           </motion.h1>
 
           {/* Subtitle */}
@@ -324,7 +324,7 @@ export default function LandingPage() {
               className="font-bold text-cyan-400"
               style={{ textShadow: '0 0 10px #00f5ff88' }}
             >
-              TECHNOVA
+              TECHDECODE
             </span>{' '}
             champion.
           </motion.p>
@@ -389,7 +389,7 @@ export default function LandingPage() {
             className="text-xs font-bold tracking-[0.35em] text-purple-500 mb-3"
             style={{ fontFamily: "'Orbitron', monospace" }}
           >
-            WHY TECHNOVA
+            WHY TECHDECODE
           </p>
           <h2
             className="text-2xl md:text-4xl font-black text-white m-0"
@@ -504,7 +504,7 @@ export default function LandingPage() {
             className="text-slate-400 text-sm md:text-base leading-relaxed"
           >
             The arena is set. The puzzles are loaded. 100 players will enter — only one will leave
-            as the TECHNOVA champion. Do you have what it takes?
+            as the TECHDECODE champion. Do you have what it takes?
           </motion.p>
 
           <motion.div variants={fadeUp} className="flex flex-wrap justify-center gap-4">

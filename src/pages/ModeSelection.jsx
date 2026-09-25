@@ -98,14 +98,14 @@ export default function ModeSelection() {
         </Link>
       </motion.div>
 
-      {/* ── TECHNOVA badge ── */}
+      {/* ── TECHDECODE badge ── */}
       <motion.p
         className="mb-3 text-xs tracking-[0.35em] font-bold text-cyan-400/70 uppercase"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.15 }}
       >
-        ⚡ TECHNOVA 2026
+        ⚡ TECHDECODE 2026
       </motion.p>
 
       {/* ── Heading ── */}

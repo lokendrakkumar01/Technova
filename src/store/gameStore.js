@@ -1,16 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { QUESTIONS, SHOWDOWN_QUESTIONS, ROUND_CONFIGS } from '../data/questions';
+import { QUESTIONS, SHOWDOWN_QUESTIONS } from '../data/questions';
 
 const generateCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
-
-const DEFAULT_LEADERBOARD = [
-  { id: 'demo1', name: 'Code Warriors', score: 420, correctAnswers: 18, totalAnswered: 22, isCurrentPlayer: false },
-  { id: 'demo2', name: 'Binary Beasts', score: 390, correctAnswers: 16, totalAnswered: 21, isCurrentPlayer: false },
-  { id: 'demo3', name: 'Debug Squad', score: 350, correctAnswers: 15, totalAnswered: 20, isCurrentPlayer: false },
-  { id: 'demo4', name: 'Syntax Titans', score: 320, correctAnswers: 14, totalAnswered: 20, isCurrentPlayer: false },
-  { id: 'demo5', name: 'Algorithm Aces', score: 280, correctAnswers: 12, totalAnswered: 19, isCurrentPlayer: false },
-];
 
 const initialState = {
   // Player/Team info
@@ -67,7 +59,8 @@ const initialState = {
   activeTeams: 0,
 
   // Leaderboard
-  leaderboard: DEFAULT_LEADERBOARD,
+  leaderboard: [],
+  questionBank: QUESTIONS,
 
   // Score pop animation
   scoreDelta: null,
@@ -84,6 +77,24 @@ const useGameStore = create(
 
       // ─── REGISTRATION ───────────────────────────────────────────────────
       setMode: (mode) => set({ mode }),
+      loadQuestionBank: async () => {
+        try {
+          const response = await fetch('/api/questions');
+          if (!response.ok) return;
+          const questions = await response.json();
+          if (Array.isArray(questions) && questions.length > 0) set({ questionBank: questions });
+        } catch { /* The bundled question bank remains available when offline. */ }
+      },
+      saveQuestionBank: async (questionBank, token) => {
+        const response = await fetch('/api/questions', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
+          body: JSON.stringify({ questions: questionBank }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Could not save the question bank.');
+        set({ questionBank });
+      },
 
       registerPlayer: ({ name, college, department }) => {
         const playerCode = generateCode();
@@ -101,7 +112,9 @@ const useGameStore = create(
           player: newPlayer,
           playerCode,
           gameStatus: 'ready',
-          leaderboard: [entry, ...s.leaderboard.map(l => ({ ...l, isCurrentPlayer: false }))],
+          leaderboard: [entry, ...s.leaderboard.filter(l => l.id !== playerId).map(l => ({ ...l, isCurrentPlayer: false }))],
+          team: null,
+          mode: 'individual',
         }));
       },
 
@@ -121,7 +134,9 @@ const useGameStore = create(
           team: newTeam,
           playerCode: teamCode,
           gameStatus: 'ready',
-          leaderboard: [entry, ...s.leaderboard.map(l => ({ ...l, isCurrentPlayer: false }))],
+          leaderboard: [entry, ...s.leaderboard.filter(l => l.id !== teamId).map(l => ({ ...l, isCurrentPlayer: false }))],
+          player: null,
+          mode: 'team',
         }));
       },
 
@@ -150,14 +165,18 @@ const useGameStore = create(
         showdownComplete: false,
         showdownIndex: 0,
         scoreDelta: null,
+        hostPaused: false,
+        hostSkipped: false,
+        hostPointsOverride: null,
+        timeUsed: 0,
       }),
 
       beginRound: () => set({ gameStatus: 'playing', phase: 'question' }),
 
       getCurrentQuestion: () => {
-        const { inShowdown, showdownIndex, currentQuestionIndex } = get();
+        const { inShowdown, showdownIndex, currentQuestionIndex, questionBank } = get();
         if (inShowdown) return SHOWDOWN_QUESTIONS[showdownIndex] || null;
-        return QUESTIONS[currentQuestionIndex] || null;
+        return questionBank[currentQuestionIndex] || null;
       },
 
       // ─── ANSWERING ───────────────────────────────────────────────────────
@@ -234,7 +253,7 @@ const useGameStore = create(
 
       // ─── NEXT QUESTION ───────────────────────────────────────────────────
       nextQuestion: () => {
-        const { currentQuestionIndex, inShowdown, showdownIndex } = get();
+        const { currentQuestionIndex, inShowdown, showdownIndex, questionBank } = get();
 
         if (inShowdown) {
           const nextShowdownIdx = showdownIndex + 1;
@@ -259,11 +278,11 @@ const useGameStore = create(
         const nextIdx = currentQuestionIndex + 1;
 
         // Determine if this is the end of a round
-        const currentQ = QUESTIONS[currentQuestionIndex];
-        const nextQ = QUESTIONS[nextIdx];
+        const currentQ = questionBank[currentQuestionIndex];
+        const nextQ = questionBank[nextIdx];
 
         const roundChanged = nextQ && nextQ.round !== currentQ.round;
-        const allDone = nextIdx >= QUESTIONS.length;
+        const allDone = nextIdx >= questionBank.length;
 
         if (allDone) {
           // Start final showdown
@@ -314,7 +333,7 @@ const useGameStore = create(
       },
 
       // ─── LIFELINES ───────────────────────────────────────────────────────
-      useFiftyFifty: () => {
+      activateFiftyFifty: () => {
         const { lifelines, isAnswerLocked } = get();
         if (lifelines.fiftyFifty.used || isAnswerLocked) return;
         const question = get().getCurrentQuestion();
@@ -328,7 +347,7 @@ const useGameStore = create(
         }));
       },
 
-      useTechHint: () => {
+      activateTechHint: () => {
         const { lifelines, isAnswerLocked, hintsRemaining } = get();
         if (lifelines.techHint.used || isAnswerLocked || hintsRemaining <= 0) return;
         const question = get().getCurrentQuestion();
@@ -341,7 +360,7 @@ const useGameStore = create(
         }));
       },
 
-      useExtraTime: () => {
+      activateExtraTime: () => {
         const { lifelines, isAnswerLocked } = get();
         if (lifelines.extraTime.used || isAnswerLocked) return;
         set((s) => ({
@@ -357,6 +376,7 @@ const useGameStore = create(
       hostResume: () => set({ hostPaused: false }),
       hostNextQuestion: () => { get().nextQuestion(); },
       hostSkipQuestion: () => {
+        if (get().isAnswerLocked) return;
         set((s) => ({
           isAnswerLocked: true,
           answerResult: 'timeout',
@@ -365,7 +385,10 @@ const useGameStore = create(
           totalAnswered: s.totalAnswered + 1,
         }));
       },
-      hostRevealAnswer: () => set({ isAnswerLocked: true, phase: 'reveal' }),
+      hostRevealAnswer: () => {
+        if (get().isAnswerLocked) return;
+        set({ isAnswerLocked: true, phase: 'reveal' });
+      },
       hostResetQuestion: () => set({
         selectedAnswer: null,
         isAnswerLocked: false,
@@ -398,12 +421,12 @@ const useGameStore = create(
       toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),
 
       // ─── RESET ───────────────────────────────────────────────────────────
-      resetGame: () => set({ ...initialState, leaderboard: DEFAULT_LEADERBOARD }),
+      resetGame: () => set({ ...initialState, questionBank: get().questionBank }),
 
       clearScoreDelta: () => set({ scoreDelta: null }),
     }),
     {
-      name: 'technova-game-state',
+      name: 'techdecode-game-state',
       partialize: (state) => ({
         mode: state.mode,
         player: state.player,
@@ -427,6 +450,12 @@ const useGameStore = create(
         showdownComplete: state.showdownComplete,
         soundEnabled: state.soundEnabled,
         leaderboard: state.leaderboard,
+        questionBank: state.questionBank,
+      }),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...persistedState,
+        leaderboard: (persistedState?.leaderboard || []).filter((entry) => !String(entry.id || '').startsWith('demo')),
       }),
     }
   )

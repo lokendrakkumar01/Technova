@@ -16,7 +16,6 @@ import {
   Users,
   Trophy,
   Sliders,
-  CheckCircle,
   AlertTriangle,
 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
@@ -26,7 +25,7 @@ export default function HostDashboard() {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
-  const [pinError, setPinError] = useState(false);
+  const [pinError, setPinError] = useState('');
 
   // Score adjust state
   const [pointsInput, setPointsInput] = useState(10);
@@ -55,14 +54,15 @@ export default function HostDashboard() {
     hostResetScore,
   } = useGameStore();
 
-  const handlePinSubmit = (e) => {
+  const handlePinSubmit = async (e) => {
     e.preventDefault();
-    if (pin === '1234') {
+    setPinError('');
+    try {
+      const response = await fetch('/api/host/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Host sign-in failed.');
       setIsAuthenticated(true);
-      setPinError(false);
-    } else {
-      setPinError(true);
-    }
+    } catch (error) { setPinError(error.message || 'Could not connect to the server.'); }
   };
 
   if (!isAuthenticated) {
@@ -94,12 +94,12 @@ export default function HostDashboard() {
                     setPin(e.target.value);
                     setPinError(false);
                   }}
-                  placeholder="Passcode (Default: 1234)"
+                  placeholder="Host passcode"
                   className="w-full px-4 py-3 text-center tracking-[0.5em] font-mono text-lg rounded-xl bg-navy-950/80 border border-white/15 text-white placeholder-white/20 focus:outline-none focus:border-cyan-neon"
                 />
                 {pinError && (
                   <p className="text-xs text-rose-400 mt-2 font-mono">
-                    INVALID CREDENTIALS // ACCESS DENIED
+                    {pinError}
                   </p>
                 )}
               </div>
@@ -128,7 +128,7 @@ export default function HostDashboard() {
               EVENT COMMAND CENTER
             </div>
             <h1 className="font-display font-black text-2xl sm:text-3xl text-white tracking-wider">
-              TECHNOVA MARSHAL CONSOLE
+              TECHDECODE MARSHAL CONSOLE
             </h1>
           </div>
 

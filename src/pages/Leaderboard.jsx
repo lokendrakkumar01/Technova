@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Trophy, Crown, Medal, Award, ArrowLeft, RefreshCw, Zap, Users } from 'lucide-react';
+import { Trophy, Crown, Medal, Award, ArrowLeft, RefreshCw } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import useGameStore from '../store/gameStore';
 
 export default function Leaderboard() {
   const navigate = useNavigate();
-  const { leaderboard, score, player, team, mode } = useGameStore();
+  const { leaderboard, player, team, mode } = useGameStore();
   const [data, setData] = useState(leaderboard);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Sync from store and optionally backend
   useEffect(() => {
-    setData(leaderboard);
-  }, [leaderboard]);
+    let active = true;
+    fetch(`${import.meta.env.VITE_API_URL || ''}/api/leaderboard`)
+      .then((response) => response.ok ? response.json() : [])
+      .then((entries) => { if (active && Array.isArray(entries) && entries.length) setData(entries); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -67,7 +72,7 @@ export default function Leaderboard() {
             LIVE AUDITORIUM STANDINGS
           </div>
           <h1 className="font-display font-black text-3xl sm:text-5xl text-white tracking-wider">
-            TECHNOVA HALL OF GLORY
+            TECHDECODE HALL OF GLORY
           </h1>
           <p className="text-xs sm:text-sm font-body text-white/60">
             Real-time score calculation and precision ranking across all participating colleges
@@ -79,7 +84,6 @@ export default function Leaderboard() {
           {data.slice(0, 3).map((item, idx) => {
             const isFirst = idx === 0;
             const isSecond = idx === 1;
-            const isThird = idx === 2;
 
             return (
               <motion.div
@@ -185,6 +189,7 @@ export default function Leaderboard() {
                 </div>
               );
             })}
+            {data.length === 0 && <p className="p-8 text-center text-sm text-white/50">No completed games have been recorded yet.</p>}
           </div>
         </div>
       </div>
