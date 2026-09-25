@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Play, Trophy, Users, User, ArrowLeft } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import useGameStore from '../store/gameStore';
+import { ROUNDS, ROUND_CONFIGS } from '../data/questions';
 
 export default function ReadyScreen() {
   const navigate = useNavigate();
@@ -95,24 +96,21 @@ export default function ReadyScreen() {
             </div>
 
             {/* Quick Rules Matrix */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-              <div className="p-4 rounded-xl bg-navy-950/60 border border-white/10 text-center">
-                <div className="font-display font-bold text-2xl text-cyan-neon mb-1">{questionBank.length} PUZZLES</div>
-                <div className="text-xs text-white/60">3 Progressive CS Rounds</div>
-                <div className="text-[10px] font-mono text-cyan-neon/60 mt-2">10-30 PTS EACH</div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-navy-950/60 border border-white/10 text-center">
-                <div className="font-display font-bold text-2xl text-purple-soft mb-1">20 SECONDS</div>
-                <div className="text-xs text-white/60">Per Question Countdown</div>
-                <div className="text-[10px] font-mono text-purple-soft/60 mt-2">AUTO-LOCK AT 0S</div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-navy-950/60 border border-white/10 text-center">
-                <div className="font-display font-bold text-2xl text-blue-bright mb-1">SHOWDOWN</div>
-                <div className="text-xs text-white/60">5 Rapid-fire Bonus Qs</div>
-                <div className="text-[10px] font-mono text-blue-bright/60 mt-2">+20 / -10 PTS PENALTY</div>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+              {ROUNDS.map((round) => {
+                const config = ROUND_CONFIGS[round.id];
+                const count = questionBank.filter((question) => Number(question.round) === round.id).length;
+                return (
+                  <motion.div key={round.id} whileHover={{ y: -3 }} className="group rounded-xl border border-white/10 bg-navy-950/60 p-4 text-left transition-colors hover:border-cyan-neon/30">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="font-display font-bold text-sm text-white">ROUND {round.id} <span className="text-cyan-neon">· {round.name}</span></div>
+                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-mono text-white/65">{count} Q</span>
+                    </div>
+                    <div className="mt-2 text-xs text-white/55">{round.answerMode === 'choice' ? 'Choose one answer' : round.answerMode === 'emoji' ? 'Decode the emoji clue and type' : 'Type your answer'}</div>
+                    <div className="mt-3 flex gap-3 text-[10px] font-mono text-cyan-neon/75"><span>{config.timePerQuestion}s EACH</span><span>•</span><span>{config.points} PTS</span></div>
+                  </motion.div>
+                );
+              })}
             </div>
 
             {/* CTA Button */}
