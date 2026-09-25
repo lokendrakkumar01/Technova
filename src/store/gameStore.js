@@ -177,13 +177,14 @@ const useGameStore = create(
       beginRound: () => set({ gameStatus: 'playing', phase: 'question' }),
 
       getCurrentQuestion: () => {
-        const { currentQuestionIndex, questionBank } = get();
+        const { inShowdown, showdownIndex, currentQuestionIndex, questionBank } = get();
+        if (inShowdown) return SHOWDOWN_QUESTIONS[showdownIndex] || null;
         return questionBank[currentQuestionIndex] || null;
       },
 
       // ─── ANSWERING ───────────────────────────────────────────────────────
       selectAnswer: (answer, timeUsed) => {
-        const { isAnswerLocked } = get();
+        const { isAnswerLocked, inShowdown } = get();
         if (isAnswerLocked) return;
 
         const question = get().getCurrentQuestion();
@@ -193,10 +194,14 @@ const useGameStore = create(
         const acceptedAnswers = [question.correctAnswer, ...(Array.isArray(question.acceptedAnswers) ? question.acceptedAnswers : [])].map(normalize);
         const isCorrect = acceptedAnswers.includes(normalize(answer));
         const basePoints = question.points;
+        const penalty = inShowdown ? question.penalty || 10 : 0;
 
         let pointsDelta = 0;
         if (isCorrect) {
           pointsDelta = basePoints;
+          // Correct answers keep their configured round value.
+        } else if (inShowdown) {
+          pointsDelta = -penalty;
         }
 
         const fastest = get().fastestAnswerTime;
@@ -253,7 +258,27 @@ const useGameStore = create(
 
       // ─── NEXT QUESTION ───────────────────────────────────────────────────
       nextQuestion: () => {
-        const { currentQuestionIndex, questionBank } = get();
+        const { currentQuestionIndex, inShowdown, showdownIndex, questionBank } = get();
+
+        if (inShowdown) {
+          const nextShowdownIdx = showdownIndex + 1;
+          if (nextShowdownIdx >= SHOWDOWN_QUESTIONS.length) {
+            set({ showdownComplete: true, gameStatus: 'finished', phase: 'question' });
+          } else {
+            set({
+              showdownIndex: nextShowdownIdx,
+              selectedAnswer: null,
+              isAnswerLocked: false,
+              answerResult: null,
+              hintShown: false,
+              hintText: null,
+              eliminatedOptions: [],
+              extraTimeAmount: 0,
+              phase: 'question',
+            });
+          }
+          return;
+        }
 
         const nextIdx = currentQuestionIndex + 1;
 
@@ -267,11 +292,7 @@ const useGameStore = create(
         if (allDone) {
           const roundScores = get().roundScores;
           const strongest = Object.entries(roundScores).reduce((a, b) => b[1] > a[1] ? b : a, ['1', 0]);
-          set({
-            gameStatus: 'finished',
-            strongestRound: strongest[0],
-          });
-        } else if (roundChanged) {
+          set({ gameStatus: 'finished', strongestRound: strongest[0] });        } else if (roundChanged) {
           set({
             currentQuestionIndex: nextIdx,
             currentRound: nextQ.round,
