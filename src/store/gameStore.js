@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { QUESTIONS, SHOWDOWN_QUESTIONS } from '../data/questions';
+import { DEFAULT_QUESTION_BANK, normalizeQuestionBank } from '../data/questions';
 
 const generateCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
@@ -23,7 +23,7 @@ const initialState = {
   wrongAnswers: 0,
   skippedAnswers: 0,
   totalAnswered: 0,
-  roundScores: { 1: 0, 2: 0, 3: 0, showdown: 0 },
+  roundScores: { 1: 0, 2: 0, 3: 0, 4: 0 },
   fastestAnswerTime: null,
   strongestRound: null,
 
@@ -39,7 +39,7 @@ const initialState = {
     techHint: { used: false, label: 'TECH HINT', icon: '💡' },
     extraTime: { used: false, label: '+10 SEC', icon: '⏱' },
   },
-  hintsRemaining: 2,
+  hintsRemaining: 1,
   hintShown: false,
   hintText: null,
   eliminatedOptions: [],
@@ -60,7 +60,7 @@ const initialState = {
 
   // Leaderboard
   leaderboard: [],
-  questionBank: QUESTIONS,
+  questionBank: normalizeQuestionBank(DEFAULT_QUESTION_BANK),
 
   // Score pop animation
   scoreDelta: null,
@@ -83,19 +83,20 @@ const useGameStore = create(
           if (!response.ok) return false;
           const questions = await response.json();
           if (!Array.isArray(questions)) return false;
-          set({ questionBank: questions.length > 0 ? questions : QUESTIONS });
+          set({ questionBank: normalizeQuestionBank(questions) });
           return true;
         } catch { return false; /* The bundled question bank remains available when offline. */ }
       },
       saveQuestionBank: async (questionBank, token) => {
+        const normalizedBank = normalizeQuestionBank(questionBank);
         const response = await fetch('/api/questions', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
-          body: JSON.stringify({ questions: questionBank }),
+          body: JSON.stringify({ questions: normalizedBank }),
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(result.error || 'Could not save the question bank.');
-        set({ questionBank });
+        set({ questionBank: normalizedBank });
       },
 
       registerPlayer: ({ name, college, department }) => {
@@ -152,14 +153,14 @@ const useGameStore = create(
         wrongAnswers: 0,
         skippedAnswers: 0,
         totalAnswered: 0,
-        roundScores: { 1: 0, 2: 0, 3: 0, showdown: 0 },
+        roundScores: { 1: 0, 2: 0, 3: 0, 4: 0 },
         fastestAnswerTime: null,
         phase: 'question',
         selectedAnswer: null,
         isAnswerLocked: false,
         answerResult: null,
         lifelines: initialState.lifelines,
-        hintsRemaining: 2,
+        hintsRemaining: 1,
         hintShown: false,
         hintText: null,
         eliminatedOptions: [],
@@ -176,29 +177,26 @@ const useGameStore = create(
       beginRound: () => set({ gameStatus: 'playing', phase: 'question' }),
 
       getCurrentQuestion: () => {
-        const { inShowdown, showdownIndex, currentQuestionIndex, questionBank } = get();
-        if (inShowdown) return SHOWDOWN_QUESTIONS[showdownIndex] || null;
+        const { currentQuestionIndex, questionBank } = get();
         return questionBank[currentQuestionIndex] || null;
       },
 
       // ─── ANSWERING ───────────────────────────────────────────────────────
       selectAnswer: (answer, timeUsed) => {
-        const { isAnswerLocked, inShowdown } = get();
+        const { isAnswerLocked } = get();
         if (isAnswerLocked) return;
 
         const question = get().getCurrentQuestion();
         if (!question) return;
 
-        const isCorrect = answer === question.correctAnswer;
+        const normalize = (value) => String(value ?? '').trim().toLocaleLowerCase().replace(/\s+/g, ' ');
+        const acceptedAnswers = [question.correctAnswer, ...(Array.isArray(question.acceptedAnswers) ? question.acceptedAnswers : [])].map(normalize);
+        const isCorrect = acceptedAnswers.includes(normalize(answer));
         const basePoints = question.points;
-        const penalty = inShowdown ? question.penalty || 10 : 0;
 
         let pointsDelta = 0;
         if (isCorrect) {
           pointsDelta = basePoints;
-          if (get().hintShown) pointsDelta = Math.max(0, pointsDelta - 5);
-        } else if (inShowdown) {
-          pointsDelta = -penalty;
         }
 
         const fastest = get().fastestAnswerTime;
@@ -208,7 +206,7 @@ const useGameStore = create(
           const newScore = Math.max(0, s.score + pointsDelta);
           const newCorrect = s.correctAnswers + (isCorrect ? 1 : 0);
           const newWrong = s.wrongAnswers + (!isCorrect ? 1 : 0);
-          const roundKey = s.inShowdown ? 'showdown' : s.currentRound;
+          const roundKey = s.currentRound;
           const newRoundScores = {
             ...s.roundScores,
             [roundKey]: (s.roundScores[roundKey] || 0) + (isCorrect ? pointsDelta : 0),
@@ -255,27 +253,7 @@ const useGameStore = create(
 
       // ─── NEXT QUESTION ───────────────────────────────────────────────────
       nextQuestion: () => {
-        const { currentQuestionIndex, inShowdown, showdownIndex, questionBank } = get();
-
-        if (inShowdown) {
-          const nextShowdownIdx = showdownIndex + 1;
-          if (nextShowdownIdx >= SHOWDOWN_QUESTIONS.length) {
-            set({ showdownComplete: true, gameStatus: 'finished', phase: 'question' });
-          } else {
-            set({
-              showdownIndex: nextShowdownIdx,
-              selectedAnswer: null,
-              isAnswerLocked: false,
-              answerResult: null,
-              hintShown: false,
-              hintText: null,
-              eliminatedOptions: [],
-              extraTimeAmount: 0,
-              phase: 'question',
-            });
-          }
-          return;
-        }
+        const { currentQuestionIndex, questionBank } = get();
 
         const nextIdx = currentQuestionIndex + 1;
 
@@ -287,22 +265,10 @@ const useGameStore = create(
         const allDone = nextIdx >= questionBank.length;
 
         if (allDone) {
-          // Start final showdown
           const roundScores = get().roundScores;
           const strongest = Object.entries(roundScores).reduce((a, b) => b[1] > a[1] ? b : a, ['1', 0]);
           set({
-            inShowdown: true,
-            showdownIndex: 0,
-            gameStatus: 'playing',
-            currentRound: 'showdown',
-            phase: 'question',
-            selectedAnswer: null,
-            isAnswerLocked: false,
-            answerResult: null,
-            hintShown: false,
-            hintText: null,
-            eliminatedOptions: [],
-            extraTimeAmount: 0,
+            gameStatus: 'finished',
             strongestRound: strongest[0],
           });
         } else if (roundChanged) {
