@@ -504,7 +504,7 @@ export default function AdminPanel() {
         <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-navy-900/60 border border-white/10">
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-white/50">ROUND:</span>
-          {['all', '1', '2', '3', '4'].map((r) => (
+            {['all', '1', '2', '3', '4'].map((r) => (
               <button
                 key={r}
                 type="button"
@@ -626,10 +626,7 @@ export default function AdminPanel() {
                     <label className="text-white/60 block mb-1">Round and answer style</label>
                     <select
                       value={newQuestion.round}
-                      onChange={(e) => {
-                        const round = Number(e.target.value);
-                        setNewQuestion({ ...newQuestion, round, points: ROUND_POINTS[round] || 10 });
-                      }}
+                      onChange={(e) => { const round = Number(e.target.value); setNewQuestion({ ...newQuestion, round, points: ROUND_POINTS[round] || 10 }); }}
                       className="w-full p-2 rounded bg-navy-900 border border-white/15 text-white"
                     >
                       <option value={1}>Round 1</option>
