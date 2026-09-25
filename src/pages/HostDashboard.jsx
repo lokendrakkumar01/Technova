@@ -18,6 +18,7 @@ import {
   Sliders,
   AlertTriangle,
   BadgeCheck,
+  Trash2,
 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import useGameStore from '../store/gameStore';
@@ -27,6 +28,10 @@ export default function HostDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
+  const [hostToken, setHostToken] = useState('');
+  const [savedLeaderboard, setSavedLeaderboard] = useState([]);
+  const [savedLeaderboardStatus, setSavedLeaderboardStatus] = useState('');
+  const [savedLeaderboardLoading, setSavedLeaderboardLoading] = useState(false);
   const [isStartingGame, setIsStartingGame] = useState(false);
   const [questionLoadError, setQuestionLoadError] = useState('');
 
@@ -44,7 +49,6 @@ export default function HostDashboard() {
     team,
     mode,
     hostPaused,
-    leaderboard,
     startGame,
     hostPause,
     hostResume,
@@ -59,6 +63,39 @@ export default function HostDashboard() {
     hostResetScore,
     loadQuestionBank,
   } = useGameStore();
+
+  const refreshSavedLeaderboard = async (token = hostToken) => {
+    if (!token) return;
+    setSavedLeaderboardLoading(true);
+    setSavedLeaderboardStatus('');
+    try {
+      const response = await fetch('/api/host/leaderboard', { cache: 'no-store', headers: { 'x-host-token': token } });
+      const entries = await response.json();
+      if (!response.ok || !Array.isArray(entries)) throw new Error(entries.error || 'Could not load saved leaderboard results.');
+      setSavedLeaderboard(entries);
+    } catch (error) {
+      setSavedLeaderboardStatus(error.message || 'Could not load the leaderboard.');
+    } finally {
+      setSavedLeaderboardLoading(false);
+    }
+  };
+
+  const deleteLeaderboardEntry = async (entry) => {
+    const id = String(entry?.id || '').trim();
+    if (!id || !window.confirm(`Delete ${entry.name}'s saved leaderboard result?`)) return;
+    setSavedLeaderboardStatus('');
+    try {
+      const response = await fetch(`/api/host/leaderboard/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: { 'x-host-token': hostToken },
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not delete this result.');
+      await refreshSavedLeaderboard();
+    } catch (error) {
+      setSavedLeaderboardStatus(error.message || 'Could not delete this result.');
+    }
+  };
 
   const handleStartGame = async () => {
     setIsStartingGame(true);
@@ -80,7 +117,9 @@ export default function HostDashboard() {
       const response = await fetch('/api/host/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Host sign-in failed.');
+      setHostToken(result.token);
       setIsAuthenticated(true);
+      void refreshSavedLeaderboard(result.token);
     } catch (error) { setPinError(error.message || 'Could not connect to the server.'); }
   };
 
@@ -372,50 +411,35 @@ export default function HostDashboard() {
           </div>
         </div>
 
-        {/* Live Leaderboard Matrix */}
-        <div className="rounded-2xl border border-white/10 bg-navy-900/70 backdrop-blur-md p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display font-bold text-base text-white tracking-wider flex items-center gap-2">
-              <Users className="w-4 h-4 text-purple-soft" />
-              LIVE LEADERBOARD OVERVIEW
-            </h2>
-            <button
-              type="button"
-              onClick={() => navigate('/leaderboard')}
-              className="text-xs font-mono text-cyan-neon hover:underline"
-            >
-              FULL SCREEN LEADERBOARD →
-            </button>
+        {/* Saved Leaderboard Management */}
+        <div className="rounded-2xl border border-white/10 bg-navy-900/70 p-6 backdrop-blur-md">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 font-display text-base font-bold tracking-wider text-white"><Users className="h-4 w-4 text-purple-soft" /> SAVED LEADERBOARD</h2>
+              <p className="mt-1 text-xs text-white/50">Remove a saved result from the public standings.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => void refreshSavedLeaderboard()} disabled={savedLeaderboardLoading} className="min-h-10 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/70 hover:text-white disabled:opacity-50">{savedLeaderboardLoading ? 'REFRESHING…' : 'REFRESH'}</button>
+              <button type="button" onClick={() => navigate('/leaderboard')} className="min-h-10 rounded-lg border border-cyan-neon/30 bg-cyan-neon/10 px-3 py-2 text-xs font-mono text-cyan-neon hover:bg-cyan-neon/15">FULL STANDINGS</button>
+            </div>
           </div>
-
-          <div className="divide-y divide-white/5">
-            {leaderboard.map((item, idx) => (
-              <div
-                key={item.id || idx}
-                className={`py-3 flex items-center justify-between ${
-                  item.isCurrentPlayer ? 'bg-cyan-neon/5 px-3 rounded-lg border border-cyan-neon/20' : ''
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="font-mono font-bold text-sm text-white/50 w-6">
-                    #{idx + 1}
-                  </span>
-                  <div>
-                    <span className="font-bold text-white text-sm">{item.name}</span>
-                    {item.isCurrentPlayer && (
-                      <span className="ml-2 text-[10px] font-mono text-cyan-neon bg-cyan-neon/10 px-1.5 py-0.5 rounded">
-                        ACTIVE CONTESTANT
-                      </span>
-                    )}
+          {savedLeaderboardStatus && <p role="alert" className="mb-3 rounded-lg border border-rose-400/20 bg-rose-400/10 p-3 text-xs text-rose-200">{savedLeaderboardStatus}</p>}
+          {savedLeaderboardLoading && savedLeaderboard.length === 0 ? <p role="status" className="py-8 text-center text-sm text-white/45">Loading saved results…</p> : savedLeaderboard.length === 0 ? <p className="py-8 text-center text-sm text-white/45">No saved results to manage.</p> : (
+            <div className="divide-y divide-white/5">
+              {savedLeaderboard.map((item, idx) => (
+                <div key={item.id || idx} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="w-7 shrink-0 font-mono text-sm font-bold text-white/45">#{idx + 1}</span>
+                    <div className="min-w-0"><span className="block truncate font-bold text-sm text-white">{item.name}</span><span className="text-[10px] uppercase tracking-wider text-white/40">{item.mode || 'individual'}</span></div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-display text-base font-black text-cyan-neon">{item.score} PTS</span>
+                    <button type="button" onClick={() => void deleteLeaderboardEntry(item)} aria-label={`Delete ${item.name}'s saved result`} title="Delete saved result" className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-rose-400/25 bg-rose-400/10 text-rose-300 transition hover:bg-rose-400/20"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </div>
-
-                <div className="font-display font-black text-cyan-neon text-base">
-                  {item.score} PTS
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Confirmation Modal */}
