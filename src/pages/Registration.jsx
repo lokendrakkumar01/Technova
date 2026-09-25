@@ -31,6 +31,7 @@ export default function Registration() {
 
   const [errors, setErrors] = useState({});
   const [registeredCode, setRegisteredCode] = useState(null);
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const handleMemberCountChange = (count) => {
     const num = parseInt(count, 10);
@@ -49,7 +50,7 @@ export default function Registration() {
     setTeamData({ ...teamData, members: newMembers });
   };
 
-  const handleIndividualSubmit = (e) => {
+  const handleIndividualSubmit = async (e) => {
     e.preventDefault();
     const newErrors = {};
     if (!individualData.name.trim()) newErrors.name = 'Player name is required';
@@ -59,12 +60,17 @@ export default function Registration() {
       return;
     }
 
-    registerPlayer(individualData);
-    // Optional backend sync in background
-    syncWithBackend({
-      type: 'individual',
-      ...individualData,
-    });
+    setIsRegistering(true);
+    setErrors({});
+    try {
+      const registration = await syncWithBackend({ type: 'individual', ...individualData });
+      registerPlayer({ ...individualData, id: registration.id });
+    } catch (error) {
+      setErrors({ backend: error.message || 'Could not connect to the game server. Please retry.' });
+      setIsRegistering(false);
+      return;
+    }
+    setIsRegistering(false);
 
     setRegisteredCode(true);
     setTimeout(() => {
@@ -72,7 +78,7 @@ export default function Registration() {
     }, 900);
   };
 
-  const handleTeamSubmit = (e) => {
+  const handleTeamSubmit = async (e) => {
     e.preventDefault();
     const newErrors = {};
     if (!teamData.teamName.trim()) newErrors.teamName = 'Team name is required';
@@ -88,16 +94,26 @@ export default function Registration() {
       return;
     }
 
-    registerTeam({
-      teamName: teamData.teamName,
-      captainName: teamData.captainName,
-      members: teamData.members.filter(Boolean),
-    });
-
-    syncWithBackend({
-      type: 'team',
-      ...teamData,
-    });
+    setIsRegistering(true);
+    setErrors({});
+    try {
+      const registration = await syncWithBackend({
+        type: 'team',
+        ...teamData,
+        members: teamData.members.filter(Boolean),
+      });
+      registerTeam({
+        teamName: teamData.teamName,
+        captainName: teamData.captainName,
+        members: teamData.members.filter(Boolean),
+        id: registration.id,
+      });
+    } catch (error) {
+      setErrors({ backend: error.message || 'Could not connect to the game server. Please retry.' });
+      setIsRegistering(false);
+      return;
+    }
+    setIsRegistering(false);
 
     setRegisteredCode(true);
     setTimeout(() => {
@@ -106,16 +122,15 @@ export default function Registration() {
   };
 
   const syncWithBackend = async (payload) => {
-    try {
-      const baseUrl = import.meta.env.VITE_API_URL || '';
-      await fetch(`${baseUrl}/api/participants/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-    } catch {
-      // Backend is optional or local; client state always persists
-    }
+    const baseUrl = import.meta.env.VITE_API_URL || '';
+    const response = await fetch(`${baseUrl}/api/participants/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.id) throw new Error(result.error || 'Could not register with the game server.');
+    return result;
   };
 
   return (
@@ -127,6 +142,7 @@ export default function Registration() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-xl"
         >
+          {errors.backend && <p role="alert" className="mb-4 rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">{errors.backend}</p>}
           {/* Back button */}
           <button
             type="button"
@@ -227,9 +243,10 @@ export default function Registration() {
                 <div className="pt-4">
                   <button
                     type="submit"
-                    className="w-full btn-primary py-3.5 flex items-center justify-center gap-2 text-sm tracking-widest uppercase cursor-pointer"
+                    disabled={isRegistering}
+                    className="w-full btn-primary py-3.5 flex items-center justify-center gap-2 text-sm tracking-widest uppercase cursor-pointer disabled:opacity-60"
                   >
-                    <span>INITIALIZE CHALLENGER</span>
+                    <span>{isRegistering ? 'REGISTERING…' : 'INITIALIZE CHALLENGER'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -318,9 +335,10 @@ export default function Registration() {
                 <div className="pt-4">
                   <button
                     type="submit"
-                    className="w-full btn-primary py-3.5 flex items-center justify-center gap-2 text-sm tracking-widest uppercase cursor-pointer"
+                    disabled={isRegistering}
+                    className="w-full btn-primary py-3.5 flex items-center justify-center gap-2 text-sm tracking-widest uppercase cursor-pointer disabled:opacity-60"
                   >
-                    <span>INITIALIZE TEAM MATRIX</span>
+                    <span>{isRegistering ? 'REGISTERING…' : 'INITIALIZE TEAM MATRIX'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>

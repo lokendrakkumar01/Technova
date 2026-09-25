@@ -42,7 +42,7 @@ export default function Results() {
     let active = true;
     fetch(`${import.meta.env.VITE_API_URL || ''}/api/leaderboard/update`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: resultId, name, score, correctAnswers, mode }),
+      body: JSON.stringify({ id: resultId, name, score, correctAnswers, totalAnswered, mode, completed: true }),
     })
       .then(async (response) => {
         const result = await response.json().catch(() => ({}));
@@ -51,7 +51,7 @@ export default function Results() {
       })
       .catch(() => { if (active) setSaveStatus('error'); });
     return () => { active = false; };
-  }, [name, resultId, score, correctAnswers, mode, saveAttempt]);
+  }, [name, resultId, score, correctAnswers, totalAnswered, mode, saveAttempt]);
 
   // Trigger confetti burst on load
   useEffect(() => {

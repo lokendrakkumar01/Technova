@@ -40,6 +40,49 @@ const writeLocalData = (name, value) => {
 let localLeaderboard = readLocalData('leaderboard.json');
 let localParticipants = readLocalData('participants.json');
 let localMemories = readLocalData('memories.json');
+let liveGameState = readLocalData('live-game-state.json', {
+  status: 'registration',
+  approvedRound: 1,
+  pendingRound: null,
+  hostPaused: false,
+  participants: [],
+});
+async function saveLiveGameState(nextState) {
+  liveGameState = nextState;
+  if (isMongoConnected && db) {
+    await db.collection('settings').replaceOne(
+      { _id: 'live-game-state' },
+      { _id: 'live-game-state', ...nextState, updatedAt: new Date() },
+      { upsert: true }
+    );
+  } else {
+    writeLocalData('live-game-state.json', nextState);
+  }
+  return liveGameState;
+}
+async function getLiveGameState() {
+  if (isMongoConnected && db) {
+    const saved = await db.collection('settings').findOne({ _id: 'live-game-state' });
+    if (saved) {
+      const { _id, updatedAt, ...state } = saved;
+      liveGameState = { ...liveGameState, ...state };
+    }
+  }
+  return liveGameState;
+}
+function publicLiveGameState(state) {
+  return {
+    status: state.status,
+    approvedRound: Number(state.approvedRound) || 1,
+    pendingRound: state.pendingRound || null,
+    hostPaused: Boolean(state.hostPaused),
+    participants: (state.participants || []).map(({ id, name, mode, score, correctAnswers, totalAnswered, registeredAt, completed }) => ({
+      id, name, mode, score: Number(score) || 0, correctAnswers: Number(correctAnswers) || 0,
+      totalAnswered: Number(totalAnswered) || 0, registeredAt, completed: Boolean(completed),
+    })),
+    updatedAt: state.updatedAt || null,
+  };
+}
 const publicMemoryId = (item) => String(item.id || item._id || crypto.createHash('sha256').update(`${item.url || ''}:${item.createdAt || ''}`).digest('hex').slice(0, 24));
 const memoryIdFilter = (id) => ({ $or: [
   { id },
@@ -62,7 +105,8 @@ async function connectToMongo() {
   }
   try {
     await client.connect();
-    db = client.db(process.env.DB_NAME || 'techdecode');
+    const databaseName = process.env.DB_NAME || new URL(mongoUri).pathname.replace(/^\/+/, '').split('?')[0] || 'techdecode';
+    db = client.db(databaseName);
     // Ping confirmation
     await client.db('admin').command({ ping: 1 });
     isMongoConnected = true;
@@ -165,21 +209,122 @@ app.get('/api/health', (req, res) => {
 });
 
 // ─── PARTICIPANTS & TEAMS ─────────────────────────────────────────────────────
+app.get('/api/game/state', async (req, res) => {
+  try { res.json(publicLiveGameState(await getLiveGameState())); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/host/game/state', requireHost, async (req, res) => {
+  try { res.json(publicLiveGameState(await getLiveGameState())); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/host/game/start', requireHost, async (req, res) => {
+  try {
+    const state = await getLiveGameState();
+    if (!(state.participants || []).length) return res.status(409).json({ error: 'Register at least one player or team before starting.' });
+    const nextState = {
+      ...state,
+      status: 'playing',
+      approvedRound: 1,
+      pendingRound: null,
+      hostPaused: false,
+      participants: (state.participants || []).map((participant) => ({
+        ...participant, score: 0, correctAnswers: 0, totalAnswered: 0, completed: false,
+      })),
+      updatedAt: new Date().toISOString(),
+    };
+    await saveLiveGameState(nextState);
+    res.json({ success: true, state: publicLiveGameState(nextState) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/host/game/pause', requireHost, async (req, res) => {
+  try {
+    const state = await getLiveGameState();
+    const nextState = { ...state, hostPaused: Boolean(req.body?.paused), updatedAt: new Date().toISOString() };
+    await saveLiveGameState(nextState);
+    res.json({ success: true, state: publicLiveGameState(nextState) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/host/game/finish', requireHost, async (req, res) => {
+  try {
+    const state = await getLiveGameState();
+    const nextState = {
+      ...state,
+      status: 'finished',
+      pendingRound: null,
+      hostPaused: false,
+      participants: (state.participants || []).map((participant) => ({ ...participant, completed: true })),
+      updatedAt: new Date().toISOString(),
+    };
+    await saveLiveGameState(nextState);
+    res.json({ success: true, state: publicLiveGameState(nextState) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/game/round-ready', async (req, res) => {
+  const participantId = String(req.body?.participantId || '').trim();
+  const round = Number(req.body?.round);
+  if (!participantId || !Number.isInteger(round) || round < 2 || round > 4) {
+    return res.status(400).json({ error: 'Participant and valid next round are required.' });
+  }
+  try {
+    const state = await getLiveGameState();
+    if (state.status !== 'playing') return res.status(409).json({ error: 'The game is not active.' });
+    if (!(state.participants || []).some((participant) => participant.id === participantId)) {
+      return res.status(404).json({ error: 'Registered participant was not found.' });
+    }
+    if (round > Number(state.approvedRound) && round === Number(state.approvedRound) + 1) {
+      await saveLiveGameState({ ...state, pendingRound: Math.max(Number(state.pendingRound) || 0, round), updatedAt: new Date().toISOString() });
+    }
+    res.json({ success: true, state: publicLiveGameState(await getLiveGameState()) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/host/round-approve', requireHost, async (req, res) => {
+  const round = Number(req.body?.round);
+  if (!Number.isInteger(round) || round < 2 || round > 4) return res.status(400).json({ error: 'A valid round is required.' });
+  try {
+    const state = await getLiveGameState();
+    if (state.status !== 'playing' || Number(state.pendingRound) !== round) {
+      return res.status(409).json({ error: 'That round is not waiting for host approval.' });
+    }
+    const nextState = { ...state, approvedRound: round, pendingRound: null, updatedAt: new Date().toISOString() };
+    await saveLiveGameState(nextState);
+    res.json({ success: true, state: publicLiveGameState(nextState) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/participants/register', async (req, res) => {
   try {
+    const state = await getLiveGameState();
+    if (state.status === 'playing') return res.status(409).json({ error: 'Registration is closed while a game is in progress.' });
+    const body = req.body || {};
+    const mode = body.type === 'team' ? 'team' : 'individual';
     const participant = {
-      ...req.body,
-      registeredAt: new Date(),
+      ...body,
+      id: crypto.randomUUID(),
+      type: mode,
+      registeredAt: new Date().toISOString(),
     };
+    const displayName = String(mode === 'team' ? body.teamName : body.name || '').trim().slice(0, 80);
+    if (!displayName) return res.status(400).json({ error: 'A player or team name is required.' });
+    const liveParticipant = { id: participant.id, name: displayName, mode, score: 0, correctAnswers: 0, totalAnswered: 0, registeredAt: participant.registeredAt, completed: false };
+    await saveLiveGameState({
+      ...state,
+      status: state.status === 'finished' ? 'registration' : state.status,
+      participants: [...(state.status === 'finished' ? [] : (state.participants || [])), liveParticipant],
+      updatedAt: new Date().toISOString(),
+    });
 
     if (isMongoConnected && db) {
-      const result = await db.collection('participants').insertOne(participant);
-      return res.status(201).json({ success: true, id: result.insertedId, participant });
+      await db.collection('participants').insertOne(participant);
+    } else {
+      localParticipants.push(participant);
+      writeLocalData('participants.json', localParticipants);
     }
-
-    participant.id = crypto.randomUUID();
-    localParticipants.push(participant);
-    writeLocalData('participants.json', localParticipants);
     res.status(201).json({ success: true, id: participant.id, participant });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -275,20 +420,29 @@ app.delete('/api/host/leaderboard/:id', requireHost, async (req, res) => {
   const id = String(req.params.id || '').trim();
   if (!id || id.length > 160) return res.status(400).json({ error: 'A valid result ID is required.' });
   try {
+    let deleted = 0;
     if (isMongoConnected && db) {
       const result = await db.collection('leaderboard').deleteOne({ id });
-      return res.json({ success: true, deleted: result.deletedCount });
+      deleted = result.deletedCount;
+    } else {
+      const previousLength = localLeaderboard.length;
+      localLeaderboard = localLeaderboard.filter((entry) => String(entry.id) !== id);
+      writeLocalData('leaderboard.json', localLeaderboard);
+      deleted = previousLength - localLeaderboard.length;
     }
-    const previousLength = localLeaderboard.length;
-    localLeaderboard = localLeaderboard.filter((entry) => String(entry.id) !== id);
-    writeLocalData('leaderboard.json', localLeaderboard);
-    res.json({ success: true, deleted: previousLength - localLeaderboard.length });
+    const state = await getLiveGameState();
+    await saveLiveGameState({
+      ...state,
+      participants: (state.participants || []).filter((participant) => participant.id !== id),
+      updatedAt: new Date().toISOString(),
+    });
+    res.json({ success: true, deleted });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/leaderboard/update', async (req, res) => {
   try {
-    const { id, name, score, correctAnswers, mode } = req.body;
+    const { id, name, score, correctAnswers, mode, totalAnswered, completed } = req.body;
     const cleanName = typeof name === 'string' ? name.trim().slice(0, 80) : '';
     const cleanScore = Number(score);
     if (!cleanName) return res.status(400).json({ error: 'Name required' });
@@ -313,6 +467,17 @@ app.post('/api/leaderboard/update', async (req, res) => {
       writeLocalData('leaderboard.json', localLeaderboard);
     }
 
+    const state = await getLiveGameState();
+    const participants = (state.participants || []).map((participant) => participant.id === entry.id
+      ? { ...participant, name: entry.name, mode: entry.mode, score: entry.score, correctAnswers: entry.correctAnswers, totalAnswered: Math.max(0, Number(totalAnswered) || 0), completed: Boolean(completed) }
+      : participant);
+    const allCompleted = participants.length > 0 && participants.every((participant) => participant.completed);
+    await saveLiveGameState({
+      ...state,
+      participants,
+      status: allCompleted ? 'finished' : state.status,
+      updatedAt: new Date().toISOString(),
+    });
     res.json({ success: true, entry });
   } catch (err) {
     res.status(500).json({ error: err.message });
