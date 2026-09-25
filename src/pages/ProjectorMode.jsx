@@ -6,7 +6,9 @@ import { ROUND_CONFIGS } from '../data/questions';
 
 export default function ProjectorMode() {
   const {
-$1$2    pendingRound,$2    currentQuestionIndex,
+    currentRound,
+    pendingRound,
+    currentQuestionIndex,
     score,
     gameStatus,
     phase,
