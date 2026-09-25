@@ -149,6 +149,7 @@ app.get('/api/health', (req, res) => {
     mongoConnected: isMongoConnected,
     storage: isMongoConnected ? 'mongodb' : 'local-json',
     durableStorage: isMongoConnected,
+    cloudinaryConfigured: Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET),
     timestamp: new Date().toISOString(),
   });
 });
