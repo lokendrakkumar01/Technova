@@ -106,7 +106,7 @@ export default function ReadyScreen() {
                       <div className="font-display font-bold text-sm text-white">ROUND {round.id} <span className="text-cyan-neon">· {round.name}</span></div>
                       <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-mono text-white/65">{count} Q</span>
                     </div>
-                    <div className="mt-2 text-xs text-white/55">{round.answerMode === 'choice' ? 'Choose one answer' : round.answerMode === 'emoji' ? 'Decode the emoji clue and type' : 'Type your answer'}</div>
+                    <div className="mt-2 text-xs text-white/55">{round.answerMode === 'choice' ? 'Choose one answer' : round.answerMode === 'emoji' ? 'Answer with an emoji' : 'Type your answer'}</div>
                     <div className="mt-3 flex gap-3 text-[10px] font-mono text-cyan-neon/75"><span>{config.timePerQuestion}s EACH</span><span>•</span><span>{config.points} PTS</span></div>
                   </motion.div>
                 );
