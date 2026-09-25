@@ -6,8 +6,7 @@ import { ROUND_CONFIGS } from '../data/questions';
 
 export default function ProjectorMode() {
   const {
-    currentRound,
-    currentQuestionIndex,
+$1$2    pendingRound,$2    currentQuestionIndex,
     score,
     gameStatus,
     phase,
@@ -66,7 +65,13 @@ export default function ProjectorMode() {
 
       {/* Main Focus: Giant Pictogram (Readable from back of auditorium) */}
       <main className="flex-1 flex flex-col items-center justify-center my-8 text-center relative z-10">
-        {question ? (
+        {gameStatus === 'roundApproval' && pendingRound ? (
+          <div className="max-w-4xl rounded-3xl border border-amber-300/30 bg-amber-300/5 px-8 py-12 text-center shadow-[0_0_80px_rgba(251,191,36,0.08)]">
+            <div className="text-xs font-mono tracking-[0.35em] text-amber-200/70">ROUND {currentRound} COMPLETE</div>
+            <div className="mt-5 font-display text-4xl font-black text-white sm:text-7xl">AWAITING HOST APPROVAL</div>
+            <p className="mt-5 text-lg text-white/55">Round {pendingRound} starts after approval.</p>
+          </div>
+        ) : question ? (
           <div className="space-y-8 max-w-5xl">
             {/* Massive Pictogram */}
             <motion.div
