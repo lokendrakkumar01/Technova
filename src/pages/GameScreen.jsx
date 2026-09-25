@@ -58,6 +58,8 @@ export default function GameScreen() {
     currentQuestionIndex,
     phase,
     score,
+    correctAnswers,
+    totalAnswered,
     selectedAnswer,
     isAnswerLocked,
     answerResult,
@@ -73,6 +75,11 @@ export default function GameScreen() {
     hostPaused,
     // Actions
     beginRound,
+    startGame,
+    hostApproveRound,
+    hostEndGame,
+    hostPause,
+    hostResume,
     selectAnswer,
     timeout,
     nextQuestion,
@@ -104,6 +111,47 @@ export default function GameScreen() {
       return;
     }
   }, [player, team, gameStatus, navigate]);
+
+  const participantId = mode === 'team' ? team?.id : player?.id;
+  const participantName = mode === 'team' ? team?.name : player?.name;
+
+  useEffect(() => {
+    if (!participantId || gameStatus !== 'roundApproval' || !pendingRound) return;
+    fetch('/api/game/round-ready', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ participantId, round: pendingRound }),
+    }).catch(() => {});
+  }, [participantId, gameStatus, pendingRound]);
+
+  useEffect(() => {
+    if (!participantId) return undefined;
+    let active = true;
+    const syncSharedGame = async () => {
+      try {
+        const response = await fetch('/api/game/state', { cache: 'no-store' });
+        if (!response.ok) return;
+        const state = await response.json();
+        if (!active) return;
+        if (state.status === 'playing' && gameStatus === 'ready') startGame();
+        if (state.status === 'finished' && gameStatus !== 'finished') hostEndGame();
+        if (Boolean(state.hostPaused) !== hostPaused) (state.hostPaused ? hostPause : hostResume)();
+        if (gameStatus === 'roundApproval' && pendingRound && Number(state.approvedRound) >= Number(pendingRound)) hostApproveRound();
+      } catch { /* Keep the game usable while the shared API reconnects. */ }
+    };
+    void syncSharedGame();
+    const timer = window.setInterval(syncSharedGame, 1500);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [participantId, gameStatus, pendingRound, hostPaused, startGame, hostApproveRound, hostEndGame, hostPause, hostResume]);
+
+  useEffect(() => {
+    if (!participantId || !participantName) return;
+    fetch('/api/leaderboard/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: participantId, name: participantName, score, correctAnswers, totalAnswered, mode }),
+    }).catch(() => {});
+  }, [participantId, participantName, score, correctAnswers, totalAnswered, mode]);
 
   const baseDuration = ROUND_CONFIGS[currentRound]?.timePerQuestion || 20;
 
@@ -368,6 +416,16 @@ export default function GameScreen() {
       </footer>
 
       {/* ─── OVERLAYS ──────────────────────────────────────────── */}
+      {gameStatus === 'ready' && (
+        <div role="status" aria-live="polite" className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/95 p-5 text-center backdrop-blur-md">
+          <div className="w-full max-w-lg rounded-3xl border border-cyan-neon/25 bg-navy-900/90 p-8 shadow-2xl sm:p-12">
+            <div className="mx-auto mb-5 flex h-14 w-14 animate-pulse items-center justify-center rounded-2xl border border-cyan-neon/30 bg-cyan-neon/10 text-2xl">✦</div>
+            <h2 className="font-display text-2xl font-black text-white sm:text-4xl">Waiting for the host</h2>
+            <p className="mt-3 text-sm leading-6 text-white/60">Your registration is saved. The game will begin as soon as the host starts the session.</p>
+            <div className="mt-7 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-mono text-white/55"><span className="h-2 w-2 animate-pulse rounded-full bg-cyan-neon" /> CONNECTED TO SHARED GAME</div>
+          </div>
+        </div>
+      )}
       {gameStatus === 'roundApproval' && pendingRound && (
         <div role="status" aria-live="polite" className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/95 p-5 text-center backdrop-blur-md">
           <div className="w-full max-w-lg rounded-3xl border border-amber-300/25 bg-navy-900/90 p-8 shadow-2xl shadow-amber-950/30 sm:p-12">
