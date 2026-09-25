@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Play, Trophy, Users, User, ArrowLeft } from 'lucide-react';
@@ -7,7 +7,10 @@ import useGameStore from '../store/gameStore';
 
 export default function ReadyScreen() {
   const navigate = useNavigate();
-  const { player, team, playerCode, mode, startGame, leaderboard, loadQuestionBank } = useGameStore();
+  const { player, team, playerCode, mode, startGame, questionBank, loadQuestionBank } = useGameStore();
+  const [isLaunching, setIsLaunching] = useState(false);
+  const [questionLoadError, setQuestionLoadError] = useState('');
+  const [standings, setStandings] = useState([]);
 
   const name = mode === 'team' ? team?.name : player?.name;
 
@@ -18,8 +21,24 @@ export default function ReadyScreen() {
     }
   }, [player, team, navigate]);
 
+  useEffect(() => {
+    let active = true;
+    fetch('/api/leaderboard', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : [])
+      .then((entries) => { if (active && Array.isArray(entries)) setStandings(entries); })
+      .catch(() => { if (active) setStandings([]); });
+    return () => { active = false; };
+  }, []);
+
   const handleLaunch = async () => {
-    await loadQuestionBank();
+    setIsLaunching(true);
+    setQuestionLoadError('');
+    const loaded = await loadQuestionBank();
+    if (!loaded) {
+      setQuestionLoadError('Could not load the latest admin question bank. Check the connection and try again.');
+      setIsLaunching(false);
+      return;
+    }
     startGame();
     navigate('/game');
   };
@@ -78,7 +97,7 @@ export default function ReadyScreen() {
             {/* Quick Rules Matrix */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
               <div className="p-4 rounded-xl bg-navy-950/60 border border-white/10 text-center">
-                <div className="font-display font-bold text-2xl text-cyan-neon mb-1">30 PUZZLES</div>
+                <div className="font-display font-bold text-2xl text-cyan-neon mb-1">{questionBank.length} PUZZLES</div>
                 <div className="text-xs text-white/60">3 Progressive CS Rounds</div>
                 <div className="text-[10px] font-mono text-cyan-neon/60 mt-2">10-30 PTS EACH</div>
               </div>
@@ -100,13 +119,15 @@ export default function ReadyScreen() {
             <motion.button
               type="button"
               onClick={handleLaunch}
+              disabled={isLaunching}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="w-full btn-primary py-4 text-base tracking-[0.2em] uppercase flex items-center justify-center gap-3 cursor-pointer shadow-neon-cyan"
+              className="w-full btn-primary py-4 text-base tracking-[0.2em] uppercase flex items-center justify-center gap-3 cursor-pointer shadow-neon-cyan disabled:opacity-60"
             >
               <Play className="w-5 h-5 fill-current" />
-              <span>START GAME PROTOCOL</span>
+              <span>{isLaunching ? 'LOADING CURRENT QUESTIONS…' : 'START GAME PROTOCOL'}</span>
             </motion.button>
+            {questionLoadError && <p role="alert" className="mt-3 text-center text-xs text-rose-300">{questionLoadError}</p>}
           </div>
 
           {/* Quick Leaderboard Glimpse */}
@@ -125,13 +146,14 @@ export default function ReadyScreen() {
               </button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {leaderboard.slice(0, 4).map((entry, idx) => (
+              {standings.slice(0, 4).map((entry, idx) => (
                 <div key={idx} className="p-2 rounded bg-navy-950/50 border border-white/5 text-xs">
                   <div className="text-white/50 font-mono text-[10px]">#{idx + 1}</div>
                   <div className="font-bold text-white truncate">{entry.name}</div>
                   <div className="text-cyan-neon font-mono text-[11px]">{entry.score} pts</div>
                 </div>
               ))}
+              {standings.length === 0 && <p className="col-span-full py-2 text-center text-xs text-white/40">No completed results have been saved yet.</p>}
             </div>
           </div>
         </motion.div>
@@ -139,3 +161,4 @@ export default function ReadyScreen() {
     </Layout>
   );
 }
+

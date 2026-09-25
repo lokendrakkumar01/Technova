@@ -9,6 +9,9 @@ import {
   Download,
   Layers,
   Search,
+  Trophy,
+  Users,
+  RefreshCw,
 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import useGameStore from '../store/gameStore';
@@ -25,6 +28,7 @@ export default function AdminPanel() {
   const [adminToken, setAdminToken] = useState('');
   const [pinError, setPinError] = useState('');
   const questions = useGameStore((state) => state.questionBank);
+  const loadQuestionBank = useGameStore((state) => state.loadQuestionBank);
   const saveQuestionBank = useGameStore((state) => state.saveQuestionBank);
   const [filterRound, setFilterRound] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,6 +43,11 @@ export default function AdminPanel() {
   const [mediaTitle, setMediaTitle] = useState('');
   const [mediaDescription, setMediaDescription] = useState('');
   const [mediaStatus, setMediaStatus] = useState('');
+  const [leaderboardEntries, setLeaderboardEntries] = useState([]);
+  const [leaderboardStatus, setLeaderboardStatus] = useState('');
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [questionBankStatus, setQuestionBankStatus] = useState('');
+  const [durableStorage, setDurableStorage] = useState(null);
   const [newQuestion, setNewQuestion] = useState({
     round: 1,
     category: 'Code Language',
@@ -61,7 +70,42 @@ export default function AdminPanel() {
       if (!response.ok) throw new Error(result.error || 'Admin sign-in failed.');
       setAdminToken(result.token);
       setIsAuthenticated(true);
+      void refreshLeaderboard(result.token);
+      const loaded = await loadQuestionBank();
+      if (!loaded) setQuestionBankStatus('Could not refresh saved questions from the server. Check the connection and retry.');
+      fetch('/api/health', { cache: 'no-store' })
+        .then((healthResponse) => healthResponse.ok ? healthResponse.json() : null)
+        .then((health) => { if (health) setDurableStorage(Boolean(health.durableStorage)); })
+        .catch(() => setDurableStorage(false));
     } catch (error) { setPinError(error.message || 'Could not connect to the server.'); }
+  };
+
+  const refreshLeaderboard = async (token = adminToken) => {
+    setLeaderboardLoading(true);
+    setLeaderboardStatus('');
+    try {
+      const response = await fetch('/api/leaderboard', { cache: 'no-store' });
+      const entries = await response.json();
+      if (!response.ok || !Array.isArray(entries)) throw new Error(entries.error || 'Could not load saved results.');
+      setLeaderboardEntries(entries);
+    } catch (error) {
+      setLeaderboardStatus(error.message || 'Could not load saved results.');
+    } finally { setLeaderboardLoading(false); }
+    return token;
+  };
+
+  const deleteLeaderboardEntry = async (entry) => {
+    if (!entry?.id || !window.confirm(`Remove ${entry.name}'s saved result from the leaderboard?`)) return;
+    setLeaderboardStatus('');
+    try {
+      const response = await fetch(`/api/admin/leaderboard/${encodeURIComponent(entry.id)}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-token': adminToken },
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not remove the result.');
+      setLeaderboardEntries((entries) => entries.filter((item) => String(item.id) !== String(entry.id)));
+    } catch (error) { setLeaderboardStatus(error.message || 'Could not remove the result.'); }
   };
 
   const handleStartEdit = (q) => {
@@ -70,7 +114,7 @@ export default function AdminPanel() {
   };
 
   const commitQuestions = async (nextQuestions) => {
-    try { await saveQuestionBank([...nextQuestions].sort((a, b) => Number(a.round) - Number(b.round)), adminToken); return true; }
+    try { await saveQuestionBank([...nextQuestions].sort((a, b) => Number(a.round) - Number(b.round)), adminToken); setQuestionBankStatus('Saved to the shared question bank. Individual, team, and host game starts will load these questions.'); return true; }
     catch (error) { alert(error.message); return false; }
   };
 
@@ -172,21 +216,21 @@ export default function AdminPanel() {
               ADMINISTRATIVE VAULT
             </h1>
             <p className="text-xs font-mono text-white/50 mb-6">
-              SYSTEM QUESTION MATRIX ACCESS
+              Configure your private ADMIN_PIN in Render → Environment.
             </p>
 
             <form onSubmit={handlePinSubmit} className="space-y-4">
               <div>
                 <input
                   type="password"
-                  maxLength={6}
+                  maxLength={128}
                   value={pin}
                   onChange={(e) => {
                     setPin(e.target.value);
                     setPinError(false);
                   }}
-                  placeholder="Admin PIN"
-                  className="w-full px-4 py-3 text-center tracking-[0.5em] font-mono text-lg rounded-xl bg-navy-950/80 border border-white/15 text-white placeholder-white/20 focus:outline-none focus:border-purple-soft"
+                  placeholder="Admin passphrase"
+                  className="w-full px-4 py-3 text-center tracking-widest font-mono text-lg rounded-xl bg-navy-950/80 border border-white/15 text-white placeholder-white/20 focus:outline-none focus:border-purple-soft"
                 />
                 {pinError && (
                   <p className="text-xs text-rose-400 mt-2 font-mono">
@@ -265,6 +309,26 @@ export default function AdminPanel() {
           </div>
         </div>
 
+        <section aria-label="Admin dashboard overview" className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {[
+            { label: 'Question bank', value: questions.length, detail: 'saved questions' },
+            { label: 'Round 1', value: questions.filter((question) => Number(question.round) === 1).length, detail: 'questions' },
+            { label: 'Round 2', value: questions.filter((question) => Number(question.round) === 2).length, detail: 'questions' },
+            { label: 'Round 3', value: questions.filter((question) => Number(question.round) === 3).length, detail: 'questions' },
+            { label: 'Saved results', value: leaderboardEntries.length, detail: 'real game records' },
+          ].map((stat) => (
+            <div key={stat.label} className="rounded-xl border border-white/10 bg-navy-900/70 p-4">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-white/45">{stat.label}</div>
+              <div className="mt-1 font-display text-2xl font-black text-cyan-neon">{stat.value}</div>
+              <div className="text-[10px] text-white/40">{stat.detail}</div>
+            </div>
+          ))}
+        </section>
+
+        {durableStorage === false && <div role="status" className="rounded-xl border border-amber-300/25 bg-amber-300/10 p-4 text-xs text-amber-100"><strong>Storage needs setup:</strong> this server is using local JSON files. Add a MongoDB connection in Render environment variables for reliable shared data that survives service restarts.</div>}
+        {durableStorage === true && <div role="status" className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 p-3 text-xs text-emerald-100">Shared MongoDB storage is connected. Admin changes and completed scores are saved centrally.</div>}
+        {questionBankStatus && <p role="status" className="text-xs text-cyan-neon">{questionBankStatus}</p>}
+
         <section className="rounded-xl border border-white/10 bg-navy-900/70 p-4 sm:p-6 space-y-4">
           <div><h2 className="font-display text-lg font-bold text-white">MEMORIES MEDIA</h2><p className="text-xs text-white/50">Upload photos, videos, YouTube clips, or external links. Saved items appear in the public gallery.</p></div>
           <form onSubmit={handleMediaSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
@@ -275,6 +339,32 @@ export default function AdminPanel() {
             <button type="submit" className="btn-primary p-2 text-xs font-bold">SAVE TO GALLERY</button>
           </form>
           {mediaStatus && <p role="status" className="text-xs text-cyan-neon">{mediaStatus}</p>}
+        </section>
+
+        <section className="rounded-xl border border-white/10 bg-navy-900/70 overflow-hidden">
+          <div className="p-4 sm:p-5 border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-400/10 border border-amber-300/20 text-amber-300 flex items-center justify-center"><Trophy className="w-5 h-5" /></div>
+              <div><h2 className="font-display text-lg font-bold text-white">LIVE GAME RESULTS</h2><p className="text-xs text-white/45">Saved individual and team scores from completed games.</p></div>
+            </div>
+            <button type="button" onClick={() => void refreshLeaderboard()} disabled={leaderboardLoading} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70 hover:text-white disabled:opacity-50"><RefreshCw className={`w-3.5 h-3.5 ${leaderboardLoading ? 'animate-spin' : ''}`} /> Refresh results</button>
+          </div>
+          {leaderboardStatus && <p role="alert" className="px-4 pt-3 text-xs text-rose-300">{leaderboardStatus}</p>}
+          {leaderboardLoading && leaderboardEntries.length === 0 ? <p className="p-6 text-center text-sm text-white/45">Loading saved results…</p> : leaderboardEntries.length === 0 ? <p className="p-6 text-center text-sm text-white/45">No completed game results have been saved yet.</p> : (
+            <div className="divide-y divide-white/5">
+              {leaderboardEntries.map((entry, index) => (
+                <div key={entry.id || `${entry.name}-${index}`} className="flex flex-wrap items-center gap-3 p-4">
+                  <span className="w-9 h-9 shrink-0 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-xs font-mono text-white/50">#{index + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-display font-bold text-sm text-white">{entry.name}</div>
+                    <div className="mt-1 flex items-center gap-2 text-[10px] uppercase text-white/40"><Users className="w-3 h-3" />{entry.mode === 'team' ? 'Team' : 'Individual'}<span>·</span>{Number(entry.correctAnswers) || 0} correct</div>
+                  </div>
+                  <div className="text-right"><div className="font-display font-black text-cyan-neon">{Number(entry.score) || 0} pts</div><div className="text-[10px] text-white/35">{entry.updatedAt ? new Date(entry.updatedAt).toLocaleDateString() : 'Saved result'}</div></div>
+                  <button type="button" onClick={() => void deleteLeaderboardEntry(entry)} className="rounded-lg p-2 text-white/40 hover:text-rose-300 hover:bg-rose-300/10" aria-label={`Delete ${entry.name}'s result`} title="Remove saved result"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Filter and Search Bar */}
@@ -292,7 +382,7 @@ export default function AdminPanel() {
                     : 'border-white/10 text-white/60 hover:border-white/20'
                 }`}
               >
-                {r === 'all' ? 'All (30)' : `Round ${r}`}
+                {r === 'all' ? `All (${questions.length})` : `Round ${r}`}
               </button>
             ))}
           </div>
@@ -539,3 +629,4 @@ export default function AdminPanel() {
     </Layout>
   );
 }
+
