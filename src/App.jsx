@@ -82,6 +82,35 @@ function NotFound() {
   )
 }
 
+class AppErrorBoundary extends React.Component {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error) {
+    console.error('The requested page could not be rendered.', error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <main className="min-h-screen bg-[#020818] text-white flex items-center justify-center p-6">
+          <section className="max-w-md text-center">
+            <h1 className="font-display text-xl font-bold text-cyan-neon">PAGE FAILED TO LOAD</h1>
+            <p className="mt-3 text-white/70">The page could not be started. Reload to try again.</p>
+            <button type="button" className="btn-primary mt-6" onClick={() => window.location.reload()}>
+              Reload page
+            </button>
+          </section>
+        </main>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // ─── App Router ───────────────────────────────────────────────────────────────
 export default function App() {
   const loadQuestionBank = useGameStore((state) => state.loadQuestionBank);
@@ -89,7 +118,8 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Suspense fallback={<div className="min-h-screen bg-[#020818] text-cyan-neon flex items-center justify-center font-mono">LOADING TECHDECODE...</div>}>
+      <AppErrorBoundary>
+      <Suspense fallback={<div role="status" aria-live="polite" className="min-h-screen bg-[#020818] text-cyan-neon flex items-center justify-center font-mono">LOADING TECHDECODE...</div>}>
       <Routes>
         <Route path="/"               element={<LandingPage />} />
         <Route path="/how-to-play"    element={<HowToPlay />} />
@@ -109,6 +139,7 @@ export default function App() {
         <Route path="*"               element={<NotFound />} />
       </Routes>
       </Suspense>
+      </AppErrorBoundary>
     </BrowserRouter>
   )
 }

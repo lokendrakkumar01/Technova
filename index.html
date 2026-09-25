@@ -12,7 +12,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div role="status" aria-live="polite" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#020818;color:#00f5ff;font:600 14px/1.5 monospace;letter-spacing:.18em;text-align:center">
+        <span aria-hidden="true" style="width:34px;height:34px;border:3px solid rgba(0,245,255,.2);border-top-color:#00f5ff;border-radius:50%;animation:boot-spin .8s linear infinite"></span>
+        <span>LOADING TECHDECODE...</span>
+      </div>
+      <style>@keyframes boot-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){#root span[aria-hidden="true"]{animation:none}}</style>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
