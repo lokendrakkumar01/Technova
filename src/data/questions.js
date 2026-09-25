@@ -1,9 +1,10 @@
-// All 30 main questions + 5 final showdown questions for TECHDECODE
+// Four-round TECHDECODE bank. Rounds 2–4 use typed answers.
 
 export const ROUNDS = [
-  { id: 1, name: 'CODE LANGUAGE', tagline: 'Know your languages.', color: 'cyan', questions: [1, 10] },
-  { id: 2, name: 'THINK LIKE A COMPUTER', tagline: 'Think in algorithms.', color: 'purple', questions: [11, 20] },
-  { id: 3, name: 'TECH ARENA', tagline: 'Prove your mastery.', color: 'blue', questions: [21, 30] },
+  { id: 1, name: 'CODE LANGUAGE', tagline: 'Choose the right answer.', color: 'cyan', questions: [1, 10], answerMode: 'choice', timePerQuestion: 20, points: '10–30' },
+  { id: 2, name: 'THINK LIKE A COMPUTER', tagline: 'Type the answer from the clue.', color: 'purple', questions: [11, 20], answerMode: 'text', timePerQuestion: 30, points: 15 },
+  { id: 3, name: 'EMOJI DECODE', tagline: 'Decode the emoji clue and type your answer.', color: 'blue', questions: [21, 30], answerMode: 'emoji', timePerQuestion: 30, points: 20 },
+  { id: 4, name: 'RAPID FIRE', tagline: 'Type fast. Get it right.', color: 'gold', questions: [31, 35], answerMode: 'text', timePerQuestion: 45, points: 30 },
 ];
 
 export const QUESTIONS = [
@@ -408,82 +409,109 @@ export const QUESTIONS = [
 export const SHOWDOWN_QUESTIONS = [
   {
     id: 'sf1',
-    round: 'showdown',
-    category: 'Final Showdown',
+    round: 4,
+    category: 'Rapid Fire',
     difficulty: 'hard',
     pictogram: '🐛 + 🔧 + 💻',
-    question: 'RAPID FIRE — WHAT IS THIS?',
+    question: 'TYPE THE TECH TERM SHOWN BY THIS CLUE.',
     options: ['Testing', 'Debugging', 'Compiling', 'Refactoring'],
     correctAnswer: 'Debugging',
     explanation: 'Debugging is the systematic process of identifying, analyzing, and removing errors from software code.',
-    points: 20,
-    penalty: 10,
+    points: 30,
     hint: 'Finding and fixing code errors.',
   },
   {
     id: 'sf2',
-    round: 'showdown',
-    category: 'Final Showdown',
+    round: 4,
+    category: 'Rapid Fire',
     difficulty: 'hard',
     pictogram: '📚 + ⬆️⬇️',
-    question: 'RAPID FIRE — WHAT IS THIS?',
+    question: 'TYPE THE TECH TERM SHOWN BY THIS CLUE.',
     options: ['Queue', 'Stack', 'Deque', 'Heap'],
     correctAnswer: 'Stack',
     explanation: 'Stack: Last-In-First-Out (LIFO). Push adds to top, Pop removes from top.',
-    points: 20,
-    penalty: 10,
+    points: 30,
     hint: 'LIFO data structure.',
   },
   {
     id: 'sf3',
-    round: 'showdown',
-    category: 'Final Showdown',
+    round: 4,
+    category: 'Rapid Fire',
     difficulty: 'hard',
     pictogram: '🔗 + 📦 + 🔗',
-    question: 'RAPID FIRE — WHAT IS THIS?',
+    question: 'TYPE THE TECH TERM SHOWN BY THIS CLUE.',
     options: ['Linked List', 'Hash Chain', 'Blockchain', 'Merkle Tree'],
     correctAnswer: 'Blockchain',
     explanation: 'Blockchain: cryptographically linked chain of data blocks, foundation of decentralized systems.',
-    points: 20,
-    penalty: 10,
+    points: 30,
     hint: 'Crypto\'s foundation technology.',
   },
   {
     id: 'sf4',
-    round: 'showdown',
-    category: 'Final Showdown',
+    round: 4,
+    category: 'Rapid Fire',
     difficulty: 'hard',
     pictogram: '🧠 + 🤖',
-    question: 'RAPID FIRE — WHAT IS THIS?',
+    question: 'TYPE THE TECH TERM SHOWN BY THIS CLUE.',
     options: ['Machine Learning', 'Deep Learning', 'Artificial Intelligence', 'Neural Network'],
     correctAnswer: 'Artificial Intelligence',
     explanation: 'AI: the broad field of making machines simulate human intelligence and decision-making.',
-    points: 20,
-    penalty: 10,
+    points: 30,
     hint: 'The broad field of intelligent machines.',
   },
   {
     id: 'sf5',
-    round: 'showdown',
-    category: 'Final Showdown',
+    round: 4,
+    category: 'Rapid Fire',
     difficulty: 'hard',
     pictogram: '🔒 + 🌐 + 🛡️',
-    question: 'RAPID FIRE — WHAT IS THIS?',
+    question: 'TYPE THE TECH TERM SHOWN BY THIS CLUE.',
     options: ['Network Security', 'Cybersecurity', 'Encryption', 'Firewall'],
     correctAnswer: 'Cybersecurity',
     explanation: 'Cybersecurity: protection of computer systems, networks, and data from digital attacks and unauthorized access.',
-    points: 20,
-    penalty: 10,
+    points: 30,
     hint: 'Protecting digital systems from attacks.',
   },
 ];
 
-export const getRoundQuestions = (round) => QUESTIONS.filter(q => q.round === round);
-export const getQuestionById = (id) => QUESTIONS.find(q => q.id === id) || SHOWDOWN_QUESTIONS.find(q => q.id === id);
+export const DEFAULT_QUESTION_BANK = [...QUESTIONS, ...SHOWDOWN_QUESTIONS];
+const EMOJI_ANSWER_ALIASES = {
+  'Cloud Computing': ['☁️'],
+  'Artificial Intelligence': ['🤖'],
+  Cybersecurity: ['🔐', '🛡️'],
+  Internet: ['🌐'],
+  'Wireless Communication': ['📡'],
+  'Machine Learning': ['🧠'],
+  Blockchain: ['🔗'],
+  'Network Security': ['🛡️'],
+  'Computer Vision': ['👁️'],
+  'Generative AI': ['✨'],
+};
+export const normalizeQuestionBank = (questions = []) => {
+  const bank = Array.isArray(questions) && questions.length ? questions : DEFAULT_QUESTION_BANK;
+  const withRoundFour = bank.some((question) => Number(question.round) === 4)
+    ? bank
+    : [...bank, ...DEFAULT_QUESTION_BANK.filter((question) => Number(question.round) === 4)];
+  return withRoundFour.map((question) => {
+    const round = Number(question.round);
+    const config = ROUND_CONFIGS[round];
+    const emojiAliases = round === 3 ? EMOJI_ANSWER_ALIASES[question.correctAnswer] || [] : [];
+    return config ? {
+      ...question,
+      round,
+      answerMode: config.answerMode,
+      points: round === 1 ? Number(question.points) || config.points : config.points,
+      acceptedAnswers: [...new Set([...(Array.isArray(question.acceptedAnswers) ? question.acceptedAnswers : []), ...emojiAliases])],
+    } : question;
+  }).sort((a, b) => Number(a.round) - Number(b.round));
+};
+export const getRoundQuestions = (round) => DEFAULT_QUESTION_BANK.filter(q => Number(q.round) === Number(round));
+export const getQuestionById = (id) => DEFAULT_QUESTION_BANK.find(q => q.id === id);
 
 export const ROUND_CONFIGS = {
-  1: { name: 'CODE LANGUAGE', tagline: 'Know your languages.', color: 'cyan', icon: '{ }', timePerQuestion: 20 },
-  2: { name: 'THINK LIKE A COMPUTER', tagline: 'Think in algorithms.', color: 'purple', icon: '01', timePerQuestion: 20 },
-  3: { name: 'TECH ARENA', tagline: 'Prove your mastery.', color: 'blue', icon: '⚡', timePerQuestion: 20 },
-  showdown: { name: 'TECH SHOWDOWN', tagline: 'Final challenge!', color: 'gold', icon: '⚡', timePerQuestion: 10 },
+  1: { name: 'CODE LANGUAGE', tagline: 'Choose the right answer.', color: 'cyan', icon: '{ }', timePerQuestion: 20, points: '10–30', answerMode: 'choice' },
+  2: { name: 'THINK LIKE A COMPUTER', tagline: 'Type the answer from the clue.', color: 'purple', icon: '01', timePerQuestion: 30, points: 15, answerMode: 'text' },
+  3: { name: 'EMOJI DECODE', tagline: 'Decode the emoji clue and type your answer.', color: 'blue', icon: '⚡', timePerQuestion: 30, points: 20, answerMode: 'emoji' },
+  4: { name: 'RAPID FIRE', tagline: 'Type fast. Get it right.', color: 'gold', icon: '⚡', timePerQuestion: 45, points: 30, answerMode: 'text' },
 };
+

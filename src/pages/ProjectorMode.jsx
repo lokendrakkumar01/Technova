@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import useGameStore from '../store/gameStore';
 import useTimer from '../hooks/useTimer';
-import { ROUND_CONFIGS, QUESTIONS, SHOWDOWN_QUESTIONS } from '../data/questions';
+import { ROUND_CONFIGS } from '../data/questions';
 
 export default function ProjectorMode() {
   const {
@@ -12,18 +12,17 @@ export default function ProjectorMode() {
     gameStatus,
     phase,
     selectedAnswer,
-    inShowdown,
-    showdownIndex,
+    questionBank,
     getCurrentQuestion,
   } = useGameStore();
 
   const question = getCurrentQuestion();
-  const totalQuestions = inShowdown ? SHOWDOWN_QUESTIONS.length : QUESTIONS.length;
-  const currentNum = inShowdown ? showdownIndex + 1 : currentQuestionIndex + 1;
-  const roundConfig = inShowdown ? ROUND_CONFIGS.showdown : (ROUND_CONFIGS[currentRound] || ROUND_CONFIGS[1]);
+  const totalQuestions = questionBank.length;
+  const currentNum = currentQuestionIndex + 1;
+  const roundConfig = ROUND_CONFIGS[currentRound] || ROUND_CONFIGS[1];
 
   const { timeLeft, timerState } = useTimer({
-    duration: inShowdown ? 10 : 20,
+    duration: roundConfig.timePerQuestion,
     isActive: phase === 'question' && gameStatus === 'playing',
   });
 
@@ -40,7 +39,7 @@ export default function ProjectorMode() {
           </div>
           <div className="h-10 w-0.5 bg-white/20" />
           <div className="font-display text-2xl sm:text-3xl font-bold tracking-widest text-purple-soft uppercase">
-            {inShowdown ? '⚡ TECH SHOWDOWN' : roundConfig.name}
+            {roundConfig.name}
           </div>
         </div>
 
@@ -80,12 +79,12 @@ export default function ProjectorMode() {
               {question.pictogram}
             </motion.div>
 
-            <div className="font-display font-bold text-2xl sm:text-4xl tracking-widest text-white/90 uppercase">
-              WHAT DOES THIS TECHNICAL PICTOGRAM REPRESENT?
+            <div className="font-display font-bold text-2xl sm:text-4xl tracking-widest text-white/90">
+              {question.question}
             </div>
 
-            {/* Answer Options Banner for audience view */}
-            <div className="grid grid-cols-2 gap-4 max-w-3xl mx-auto pt-4">
+            {/* Choice answers for Round 1; typed rounds reveal the accepted answer after lock. */}
+            {Number(currentRound) === 1 ? <div className="grid grid-cols-2 gap-4 max-w-3xl mx-auto pt-4">
               {question.options.map((opt, i) => {
                 const label = ['A', 'B', 'C', 'D'][i];
                 const isCorrect = phase === 'reveal' && opt === question.correctAnswer;
@@ -109,7 +108,7 @@ export default function ProjectorMode() {
                   </div>
                 );
               })}
-            </div>
+            </div> : phase === 'reveal' && <div className="pt-4 font-display text-2xl sm:text-4xl font-black text-emerald-300">ANSWER: {question.correctAnswer}</div>}
           </div>
         ) : (
           <div className="font-display text-4xl text-white/40">
@@ -142,3 +141,4 @@ export default function ProjectorMode() {
     </div>
   );
 }
+

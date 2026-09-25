@@ -21,23 +21,23 @@ const FLOAT_SYMBOLS = [
 const FEATURES = [
   {
     icon: '🧩',
-    title: '30 PICTOGRAM PUZZLES',
+    title: '35 TECH CHALLENGES',
     description:
-      'Each round unleashes hand-crafted technical pictograms spanning algorithms, languages, frameworks, and engineering concepts. No two games are alike.',
+      'Four rounds span programming language choices, typed answers, emoji decoding, and a rapid-fire finish.',
     accent: '#00f5ff',
   },
   {
     icon: '🏆',
-    title: '3 EPIC ROUNDS',
+    title: '4 INTERACTIVE ROUNDS',
     description:
-      'Progress through three escalating rounds — Warm-Up, Challenge, and the heart-pounding Final Showdown. Difficulty spikes. Stakes skyrocket.',
+      'Choose in Round 1, type in Round 2, decode emojis in Round 3, then take on the 45-second Rapid Fire round.',
     accent: '#9333ea',
   },
   {
     icon: '⚡',
-    title: 'FINAL SHOWDOWN',
+    title: 'RAPID FIRE',
     description:
-      'The last survivors face a sudden-death lightning round. One wrong answer and you\'re out. Only the sharpest minds claim the TECHDECODE crown.',
+      'Round 4 gives every question a 45-second timer and 30 points for a correct answer.',
     accent: '#f59e0b',
   },
 ];
@@ -45,9 +45,9 @@ const FEATURES = [
 // ─── Stats data ──────────────────────────────────────────────────────────────
 const STATS = [
   { value: '60-100', label: 'PLAYERS' },
-  { value: '3',      label: 'ROUNDS' },
+  { value: '4',      label: 'ROUNDS' },
   { value: '35',     label: 'QUESTIONS' },
-  { value: '20 SEC', label: 'PER QUESTION' },
+  { value: '20–45 SEC', label: 'PER QUESTION' },
 ];
 
 // ─── Animation variants ───────────────────────────────────────────────────────
@@ -527,3 +527,4 @@ export default function LandingPage() {
     </Layout>
   );
 }
+

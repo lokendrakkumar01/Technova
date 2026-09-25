@@ -6,6 +6,9 @@ export default function RoundTransition({
   roundNumber = 1,
   roundName = 'CODE LANGUAGE',
   roundTagline = 'Know your languages.',
+  questionCount = 10,
+  timePerQuestion = 20,
+  points = 10,
   onComplete,
 }) {
   const [countdown, setCountdown] = useState(3);
@@ -89,9 +92,11 @@ export default function RoundTransition({
               </p>
 
               <div className="pt-4 flex items-center justify-center gap-4 text-xs font-mono text-white/40">
-                <span>[ 10 QUESTIONS ]</span>
+                <span>[ {questionCount} QUESTIONS ]</span>
                 <span>•</span>
-                <span>[ 20 SECONDS EACH ]</span>
+                <span>[ {timePerQuestion} SECONDS EACH ]</span>
+                <span>•</span>
+                <span>[ {points} POINTS EACH ]</span>
                 <span>•</span>
                 <span>[ LIVE SCORING ]</span>
               </div>
@@ -145,3 +150,4 @@ export default function RoundTransition({
     </motion.div>
   );
 }
+

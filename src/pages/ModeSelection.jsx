@@ -220,8 +220,9 @@ export default function ModeSelection() {
         animate={{ opacity: 1 }}
         transition={{ delay: 0.7 }}
       >
-        🏆 Compete across 3 rounds + Final Showdown &nbsp;·&nbsp; 30 questions &nbsp;·&nbsp; 20 sec each
+        🏆 Compete across 4 rounds &nbsp;·&nbsp; 35 questions &nbsp;·&nbsp; 20–45 sec per question
       </motion.p>
     </div>
   );
 }
+

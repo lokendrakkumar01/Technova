@@ -18,7 +18,8 @@ import Layout from '../components/layout/Layout';
 import useGameStore from '../store/gameStore';
 
 const EMOJI_OPTIONS = ['💻', '⌨️', '🐍', '⚙️', '🧠', '🤖', '🔒', '🌐', '☁️', '📱', '📊', '🔗', '🧩', '⚡'];
-const isValidQuestion = (q) => q && [1, 2, 3].includes(Number(q.round)) &&
+const ROUND_POINTS = { 2: 15, 3: 20, 4: 30 };
+const isValidQuestion = (q) => q && [1, 2, 3, 4].includes(Number(q.round)) &&
   Array.isArray(q.options) && q.options.length === 4 && q.options.every((option) => typeof option === 'string' && option.trim()) &&
   typeof q.correctAnswer === 'string' && q.options.includes(q.correctAnswer) &&
   typeof q.pictogram === 'string' && q.pictogram.trim() && typeof q.question === 'string' && q.question.trim();
@@ -189,6 +190,8 @@ export default function AdminPanel() {
   };
 
   const commitQuestions = async (nextQuestions) => {
+    const missingRounds = [1, 2, 3, 4].filter((round) => !nextQuestions.some((question) => Number(question.round) === round));
+    if (missingRounds.length) { alert(`Keep at least one question in each round. Empty: ${missingRounds.map((round) => `Round ${round}`).join(', ')}.`); return false; }
     try { await saveQuestionBank([...nextQuestions].sort((a, b) => Number(a.round) - Number(b.round)), adminToken); setQuestionBankStatus('Saved to the shared question bank. Individual, team, and host game starts will load these questions.'); return true; }
     catch (error) { alert(error.message); return false; }
   };
@@ -385,12 +388,13 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        <section aria-label="Admin dashboard overview" className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <section aria-label="Admin dashboard overview" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
             { label: 'Question bank', value: questions.length, detail: 'saved questions' },
             { label: 'Round 1', value: questions.filter((question) => Number(question.round) === 1).length, detail: 'questions' },
             { label: 'Round 2', value: questions.filter((question) => Number(question.round) === 2).length, detail: 'questions' },
             { label: 'Round 3', value: questions.filter((question) => Number(question.round) === 3).length, detail: 'questions' },
+            { label: 'Round 4', value: questions.filter((question) => Number(question.round) === 4).length, detail: 'questions' },
             { label: 'Saved results', value: leaderboardEntries.length, detail: 'real game records' },
           ].map((stat) => (
             <div key={stat.label} className="rounded-xl border border-white/10 bg-navy-900/70 p-4">
@@ -500,7 +504,7 @@ export default function AdminPanel() {
         <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-navy-900/60 border border-white/10">
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-white/50">ROUND:</span>
-            {['all', '1', '2', '3'].map((r) => (
+            {['all', '1', '2', '3', '4'].map((r) => (
               <button
                 key={r}
                 type="button"
@@ -592,13 +596,13 @@ export default function AdminPanel() {
             <form onSubmit={(e) => { e.preventDefault(); void handleSaveEdit(); }} className="max-w-2xl w-full rounded-2xl border border-white/20 bg-navy-950 p-5 sm:p-6 space-y-3 my-8 max-h-[90vh] overflow-y-auto">
               <h2 className="font-display text-xl font-bold text-white">EDIT QUESTION</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="text-xs text-white/60">Round<select value={editFormData.round || 1} onChange={(e) => setEditFormData({ ...editFormData, round: Number(e.target.value) })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white"><option value={1}>Round 1</option><option value={2}>Round 2</option><option value={3}>Round 3</option></select></label>
+                <label className="text-xs text-white/60">Round<select value={editFormData.round || 1} onChange={(e) => { const round = Number(e.target.value); setEditFormData({ ...editFormData, round, points: ROUND_POINTS[round] || editFormData.points }); }} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white"><option value={1}>Round 1 · Choose</option><option value={2}>Round 2 · Typed</option><option value={3}>Round 3 · Emoji decode</option><option value={4}>Round 4 · Rapid fire</option></select></label>
                 <label className="text-xs text-white/60">Difficulty<select value={editFormData.difficulty || 'medium'} onChange={(e) => setEditFormData({ ...editFormData, difficulty: e.target.value })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white"><option>easy</option><option>medium</option><option>hard</option></select></label>
                 <label className="text-xs text-white/60 sm:col-span-2">Pictogram<input required value={editFormData.pictogram || ''} onChange={(e) => setEditFormData({ ...editFormData, pictogram: e.target.value })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white" /></label>
                 <div className="sm:col-span-2 flex flex-wrap gap-1">{EMOJI_OPTIONS.map((emoji) => <button key={emoji} type="button" onClick={() => setEditFormData({ ...editFormData, pictogram: (editFormData.pictogram || '') + emoji })} className="rounded bg-white/10 px-2 py-1 text-lg" aria-label={`Add ${emoji} to pictogram`}>{emoji}</button>)}</div>
                 <label className="text-xs text-white/60 sm:col-span-2">Question<input required value={editFormData.question || ''} onChange={(e) => setEditFormData({ ...editFormData, question: e.target.value })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white" /></label>
-                <label className="text-xs text-white/60">Correct answer<select value={editFormData.correctAnswer || ''} onChange={(e) => setEditFormData({ ...editFormData, correctAnswer: e.target.value })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white">{(editFormData.options || []).map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
-                <label className="text-xs text-white/60">Points<input type="number" min="0" value={editFormData.points || 0} onChange={(e) => setEditFormData({ ...editFormData, points: Number(e.target.value) })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white" /></label>
+                <label className="text-xs text-white/60">Correct answer<select value={editFormData.correctAnswer || ''} onChange={(e) => setEditFormData({ ...editFormData, correctAnswer: e.target.value, acceptedAnswers: [] })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white">{(editFormData.options || []).map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+                <label className="text-xs text-white/60">Points<input type="number" min="0" value={editFormData.points || 0} readOnly={Boolean(ROUND_POINTS[Number(editFormData.round)])} onChange={(e) => setEditFormData({ ...editFormData, points: Number(e.target.value) })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white read-only:opacity-60" /></label>
                 {(editFormData.options || []).map((option, index) => <label key={index} className="text-xs text-white/60">Option {index + 1}<input required value={option} onChange={(e) => { const options = [...editFormData.options]; options[index] = e.target.value; setEditFormData({ ...editFormData, options, ...(editFormData.correctAnswer === option ? { correctAnswer: e.target.value } : {}) }); }} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white" /></label>)}
                 <label className="text-xs text-white/60">Hint<input value={editFormData.hint || ''} onChange={(e) => setEditFormData({ ...editFormData, hint: e.target.value })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white" /></label>
                 <label className="text-xs text-white/60 sm:col-span-2">Explanation<textarea rows={3} value={editFormData.explanation || ''} onChange={(e) => setEditFormData({ ...editFormData, explanation: e.target.value })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white" /></label>
@@ -619,17 +623,16 @@ export default function AdminPanel() {
               <form onSubmit={handleCreateQuestion} className="space-y-3 text-xs">
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="text-white/60 block mb-1">Round (1, 2, or 3)</label>
+                    <label className="text-white/60 block mb-1">Round and answer style</label>
                     <select
                       value={newQuestion.round}
-                      onChange={(e) =>
-                        setNewQuestion({ ...newQuestion, round: Number(e.target.value) })
-                      }
+                      onChange={(e) => { const round = Number(e.target.value); setNewQuestion({ ...newQuestion, round, points: ROUND_POINTS[round] || 10 }); }}
                       className="w-full p-2 rounded bg-navy-900 border border-white/15 text-white"
                     >
                       <option value={1}>Round 1</option>
-                      <option value={2}>Round 2</option>
-                      <option value={3}>Round 3</option>
+                      <option value={2}>Round 2 · Type answer</option>
+                      <option value={3}>Round 3 · Emoji decode</option>
+                      <option value={4}>Round 4 · Rapid fire</option>
                     </select>
                   </div>
 
@@ -653,6 +656,7 @@ export default function AdminPanel() {
                     <input
                       type="number"
                       value={newQuestion.points}
+                      readOnly={Boolean(ROUND_POINTS[newQuestion.round])}
                       onChange={(e) =>
                         setNewQuestion({ ...newQuestion, points: Number(e.target.value) })
                       }

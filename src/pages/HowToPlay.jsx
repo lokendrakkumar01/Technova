@@ -27,19 +27,19 @@ const STEPS = [
     n: '03',
     icon: '⏱️',
     title: 'Answer Fast, Score Big',
-    desc: 'Each question has a 20-second timer. Pick the correct answer before time runs out. Speed doesn\'t affect points — but accuracy does.',
+    desc: 'Choose an option in Round 1, type answers in Round 2, decode emoji clues in Round 3, and type quickly in Round 4.',
   },
   {
     n: '04',
     icon: '💡',
     title: 'Use Your Lifelines Wisely',
-    desc: 'You get 3 lifelines total. Use them strategically — once gone, they\'re gone. Hints deduct 5 points from the question\'s value.',
+    desc: 'Use the 50/50 option in Round 1 or ask for a tech hint. Hints do not change the round\'s fixed points.',
   },
   {
     n: '05',
     icon: '🏆',
-    title: 'Survive the Final Showdown',
-    desc: 'After 3 regular rounds, the Final Showdown begins. Higher stakes: +20 for correct, −10 for wrong. No pressure! 😅',
+    title: 'Finish the Rapid Fire Round',
+    desc: 'Round 4 gives you 45 seconds per question. Each correct answer is worth 30 points.',
   },
   {
     n: '06',
@@ -50,10 +50,10 @@ const STEPS = [
 ];
 
 const SCORING = [
-  { difficulty: 'Easy', emoji: '🟢', points: 10, time: '20 sec', rounds: '1' },
-  { difficulty: 'Medium', emoji: '🟡', points: 20, time: '20 sec', rounds: '2' },
-  { difficulty: 'Hard', emoji: '🔴', points: 30, time: '20 sec', rounds: '3' },
-  { difficulty: 'Showdown', emoji: '⚡', points: 20, time: '20 sec', rounds: 'Final' },
+  { difficulty: 'Choose an answer', emoji: '🟦', points: '10–30', time: '20 sec', rounds: '1' },
+  { difficulty: 'Type an answer', emoji: '⌨️', points: 15, time: '30 sec', rounds: '2' },
+  { difficulty: 'Decode emojis', emoji: '🧩', points: 20, time: '30 sec', rounds: '3' },
+  { difficulty: 'Rapid fire', emoji: '⚡', points: 30, time: '45 sec', rounds: '4' },
 ];
 
 const LIFELINES = [
@@ -71,23 +71,16 @@ const LIFELINES = [
     color: 'text-yellow-300',
     border: 'border-yellow-500/40',
     bg: 'bg-yellow-500/10',
-    desc: 'Reveals a contextual clue for the current question. Using a hint deducts 5 pts from the possible score. 2 hints available.',
-  },
-  {
-    icon: '⏱',
-    name: '+10 SEC',
-    color: 'text-purple-300',
-    border: 'border-purple-500/40',
-    bg: 'bg-purple-500/10',
-    desc: 'Adds 10 extra seconds to the current question timer. Perfect for tricky questions when you need more time to think.',
+    desc: 'Reveals a contextual clue for the current question. Round points stay fixed.',
   },
 ];
 
 const TIMER_RULES = [
-  { rule: 'Default time per question', value: '20 seconds' },
-  { rule: '+10 SEC lifeline bonus', value: '+10 seconds' },
+  { rule: 'Round 1 · Choose', value: '20 seconds · 10–30 points' },
+  { rule: 'Round 2 · Type', value: '30 seconds · 15 points' },
+  { rule: 'Round 3 · Emoji decode', value: '30 seconds · 20 points' },
+  { rule: 'Round 4 · Rapid fire', value: '45 seconds · 30 points' },
   { rule: 'Timer auto-submits on expiry', value: 'Timeout = 0 pts' },
-  { rule: 'Final Showdown time', value: '20 seconds' },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -245,17 +238,15 @@ export default function HowToPlay() {
               <div className="flex items-center gap-3 p-3 rounded-xl border border-red-500/30 bg-red-500/8">
                 <span className="text-xl">⚠️</span>
                 <div>
-                  <p className="text-xs font-black text-red-400 tracking-wider">HINT PENALTY</p>
-                  <p className="text-xs text-slate-400">Using a Tech Hint deducts <span className="text-red-400 font-bold">−5 pts</span> from the question's value</p>
+                  <p className="text-xs font-black text-red-400 tracking-wider">FIXED ROUND POINTS</p>
+                  <p className="text-xs text-slate-400">Tech hints reveal a clue and do not change points earned for a correct answer.</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 rounded-xl border border-orange-500/30 bg-orange-500/8">
                 <span className="text-xl">⚡</span>
                 <div>
-                  <p className="text-xs font-black text-orange-400 tracking-wider">FINAL SHOWDOWN</p>
-                  <p className="text-xs text-slate-400">
-                    Correct: <span className="text-green-400 font-bold">+20 pts</span> &nbsp;·&nbsp; Wrong: <span className="text-red-400 font-bold">−10 pts</span>
-                  </p>
+                  <p className="text-xs font-black text-orange-400 tracking-wider">FOUR ROUND FORMATS</p>
+                  <p className="text-xs text-slate-400">Choose, type, decode emoji clues, then finish with Rapid Fire.</p>
                 </div>
               </div>
             </div>
@@ -269,9 +260,9 @@ export default function HowToPlay() {
           <GlassCard className="p-6 md:p-8">
             <SectionTitle icon="🛡️">LIFELINES</SectionTitle>
             <p className="text-slate-400 text-sm mb-6">
-              You have <span className="text-white font-bold">3 lifelines</span> — one of each type. Once used, they cannot be recovered. Use them wisely!
+              You have <span className="text-white font-bold">two lifelines</span>. Each is available once during a game.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {LIFELINES.map((ll) => (
                 <div
                   key={ll.name}
@@ -364,3 +355,4 @@ export default function HowToPlay() {
     </div>
   );
 }
+

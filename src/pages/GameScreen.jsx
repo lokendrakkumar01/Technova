@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -11,13 +11,38 @@ import {
 import useGameStore from '../store/gameStore';
 import useTimer from '../hooks/useTimer';
 import useSound from '../hooks/useSound';
-import { ROUND_CONFIGS, SHOWDOWN_QUESTIONS } from '../data/questions';
+import { ROUND_CONFIGS } from '../data/questions';
 
 import PictogramDisplay from '../components/game/PictogramDisplay';
 import AnswerButtons from '../components/game/AnswerButtons';
 import Lifelines from '../components/game/Lifelines';
 import RoundTransition from '../components/game/RoundTransition';
 import AnswerReveal from '../components/game/AnswerReveal';
+
+function TypedAnswerForm({ answerMode, isAnswerLocked, hostPaused, onSubmit }) {
+  const [typedAnswer, setTypedAnswer] = useState('');
+  const answerEmojiOptions = ['☁️', '🤖', '🔐', '🌐', '📡', '🧠', '🔗', '🛡️', '👁️', '✨', '💻', '⚡'];
+  return (
+    <motion.form
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      onSubmit={(event) => { event.preventDefault(); if (typedAnswer.trim()) onSubmit(typedAnswer.trim()); }}
+      className="flex flex-col sm:flex-row sm:flex-wrap gap-3 rounded-2xl border border-cyan-neon/20 bg-navy-900/70 p-3 shadow-[0_12px_50px_rgba(0,0,0,0.25)]"
+    >
+      <input
+        autoComplete="off" autoCapitalize="words" maxLength={120}
+        value={typedAnswer} onChange={(event) => setTypedAnswer(event.target.value)}
+        disabled={isAnswerLocked || hostPaused}
+        aria-label="Type your answer"
+        placeholder={answerMode === 'emoji' ? 'Choose an emoji that answers the clue…' : 'Type your answer…'}
+        className="min-h-12 flex-1 rounded-xl border border-white/10 bg-black/30 px-4 text-base text-white outline-none placeholder:text-white/35 focus:border-cyan-neon/60 focus:ring-2 focus:ring-cyan-neon/20 disabled:opacity-50"
+      />
+      <button type="submit" disabled={isAnswerLocked || hostPaused || !typedAnswer.trim()} className="min-h-12 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 px-6 font-display text-sm font-black tracking-widest text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
+        LOCK ANSWER
+      </button>
+      {answerMode === 'emoji' && <div className="flex flex-wrap justify-center gap-2 sm:basis-full">{answerEmojiOptions.map((emoji) => <button key={emoji} type="button" disabled={isAnswerLocked || hostPaused} onClick={() => setTypedAnswer((answer) => answer + emoji)} className="min-h-10 min-w-10 rounded-lg border border-white/10 bg-white/5 text-xl transition hover:border-cyan-neon/40 hover:bg-cyan-neon/10 disabled:opacity-40" aria-label={`Add ${emoji} to your answer`}>{emoji}</button>)}</div>}
+    </motion.form>
+  );
+}
 
 export default function GameScreen() {
   const navigate = useNavigate();
@@ -42,7 +67,6 @@ export default function GameScreen() {
     eliminatedOptions,
     extraTimeAmount,
     inShowdown,
-    showdownIndex,
     scoreDelta,
     soundEnabled,
     hostPaused,
@@ -80,8 +104,7 @@ export default function GameScreen() {
     }
   }, [player, team, gameStatus, navigate]);
 
-  // Determine Duration (20s normal, 10s for Showdown)
-  const baseDuration = inShowdown ? 10 : 20;
+  const baseDuration = ROUND_CONFIGS[currentRound]?.timePerQuestion || 20;
 
   // Handle Timeout
   const handleTimeout = useCallback(() => {
@@ -114,7 +137,9 @@ export default function GameScreen() {
     play('click');
     selectAnswer(ans, timeUsed);
 
-    if (ans === question?.correctAnswer) {
+    const normalizeAnswer = (value) => String(value ?? '').trim().toLocaleLowerCase().replace(/\s+/g, ' ');
+    const isCorrect = [question?.correctAnswer, ...(Array.isArray(question?.acceptedAnswers) ? question.acceptedAnswers : [])].some((value) => normalizeAnswer(value) === normalizeAnswer(ans));
+    if (isCorrect) {
       setTimeout(() => play('correct'), 150);
     } else {
       setTimeout(() => play('wrong'), 150);
@@ -137,9 +162,10 @@ export default function GameScreen() {
   };
 
   // Question numbering
-  const totalQuestionsCount = inShowdown ? SHOWDOWN_QUESTIONS.length : questionBank.length;
-  const currentNumber = inShowdown ? showdownIndex + 1 : currentQuestionIndex + 1;
-  const roundConfig = inShowdown ? ROUND_CONFIGS.showdown : (ROUND_CONFIGS[currentRound] || ROUND_CONFIGS[1]);
+  const totalQuestionsCount = questionBank.length;
+  const currentNumber = currentQuestionIndex + 1;
+  const roundConfig = ROUND_CONFIGS[currentRound] || ROUND_CONFIGS[1];
+  const answerMode = roundConfig.answerMode || (currentRound === 1 ? 'choice' : currentRound === 3 ? 'emoji' : 'text');
 
   return (
     <div className="min-h-screen bg-[#020818] text-white flex flex-col justify-between relative overflow-hidden select-none">
@@ -179,7 +205,7 @@ export default function GameScreen() {
                     : 'bg-cyan-neon/10 text-cyan-neon border border-cyan-neon/30'
                 }`}
               >
-                {inShowdown ? '⚡ RAPID SHOWDOWN' : roundConfig.name}
+                {roundConfig.name}
               </span>
               <span className="text-xs sm:text-sm font-mono text-white/80 font-bold">
                 Q {currentNumber} / {totalQuestionsCount}
@@ -283,8 +309,9 @@ export default function GameScreen() {
               <PictogramDisplay pictogram={question.pictogram} />
 
               <div className="font-display font-bold text-lg sm:text-xl text-white tracking-wider mt-4">
-                WHAT DOES THIS TECHNICAL PICTOGRAM REPRESENT?
+                {question.question}
               </div>
+              {answerMode === 'emoji' && <div className="mt-2 text-[10px] font-mono tracking-widest text-blue-bright">ANSWER WITH AN EMOJI</div>}
 
               {/* Hint Box (if activated) */}
               <AnimatePresence>
@@ -303,14 +330,18 @@ export default function GameScreen() {
             </div>
 
             {/* Answer Options Grid */}
-            <AnswerButtons
-              options={question.options}
-              selectedAnswer={selectedAnswer}
-              correctAnswer={question.correctAnswer}
-              isLocked={isAnswerLocked}
-              eliminatedOptions={eliminatedOptions}
-              onSelect={handleSelectAnswer}
-            />
+            {answerMode === 'choice' ? (
+              <AnswerButtons
+                options={question.options}
+                selectedAnswer={selectedAnswer}
+                correctAnswer={question.correctAnswer}
+                isLocked={isAnswerLocked}
+                eliminatedOptions={eliminatedOptions}
+                onSelect={handleSelectAnswer}
+              />
+            ) : (
+              <TypedAnswerForm key={question.id} answerMode={answerMode} isAnswerLocked={isAnswerLocked} hostPaused={hostPaused} onSubmit={handleSelectAnswer} />
+            )}
 
             {/* Lifelines Panel (Disabled in Showdown) */}
             {!inShowdown && (
@@ -322,6 +353,7 @@ export default function GameScreen() {
                   onTechHint={handleLifelineHint}
                   onExtraTime={handleLifelineExtraTime}
                   disabled={isAnswerLocked || hostPaused}
+                  showFiftyFifty={answerMode === 'choice'}
                 />
               </div>
             )}
@@ -340,9 +372,12 @@ export default function GameScreen() {
         {gameStatus === 'roundTransition' && (
           <RoundTransition
             roundNumber={currentRound}
-            roundName={roundConfig.name}
-            roundTagline={roundConfig.tagline}
-            onComplete={beginRound}
+          roundName={roundConfig.name}
+          roundTagline={roundConfig.tagline}
+          questionCount={questionBank.filter((item) => Number(item.round) === Number(currentRound)).length}
+          timePerQuestion={roundConfig.timePerQuestion}
+          points={roundConfig.points}
+          onComplete={beginRound}
           />
         )}
       </AnimatePresence>
@@ -362,3 +397,4 @@ export default function GameScreen() {
     </div>
   );
 }
+
