@@ -8,7 +8,7 @@ import { ROUNDS, ROUND_CONFIGS } from '../data/questions';
 
 export default function ReadyScreen() {
   const navigate = useNavigate();
-  const { player, team, playerCode, mode, startGame, questionBank, loadQuestionBank } = useGameStore();
+  const { player, team, playerCode, mode, questionBank, loadQuestionBank } = useGameStore();
   const [isLaunching, setIsLaunching] = useState(false);
   const [questionLoadError, setQuestionLoadError] = useState('');
   const [standings, setStandings] = useState([]);
@@ -40,7 +40,6 @@ export default function ReadyScreen() {
       setIsLaunching(false);
       return;
     }
-    startGame();
     navigate('/game');
   };
 
