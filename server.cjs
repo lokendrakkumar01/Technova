@@ -222,6 +222,7 @@ app.get('/api/host/game/state', requireHost, async (req, res) => {
 app.post('/api/host/game/start', requireHost, async (req, res) => {
   try {
     const state = await getLiveGameState();
+    if (!(state.participants || []).length) return res.status(409).json({ error: 'Register at least one player or team before starting.' });
     const nextState = {
       ...state,
       status: 'playing',
@@ -242,6 +243,22 @@ app.post('/api/host/game/pause', requireHost, async (req, res) => {
   try {
     const state = await getLiveGameState();
     const nextState = { ...state, hostPaused: Boolean(req.body?.paused), updatedAt: new Date().toISOString() };
+    await saveLiveGameState(nextState);
+    res.json({ success: true, state: publicLiveGameState(nextState) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/host/game/finish', requireHost, async (req, res) => {
+  try {
+    const state = await getLiveGameState();
+    const nextState = {
+      ...state,
+      status: 'finished',
+      pendingRound: null,
+      hostPaused: false,
+      participants: (state.participants || []).map((participant) => ({ ...participant, completed: true })),
+      updatedAt: new Date().toISOString(),
+    };
     await saveLiveGameState(nextState);
     res.json({ success: true, state: publicLiveGameState(nextState) });
   } catch (err) { res.status(500).json({ error: err.message }); }
