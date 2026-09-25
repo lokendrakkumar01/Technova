@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -18,6 +18,8 @@ import useGameStore from '../store/gameStore';
 
 export default function Results() {
   const navigate = useNavigate();
+  const [saveAttempt, setSaveAttempt] = useState(0);
+  const [saveStatus, setSaveStatus] = useState('saving');
   const {
     player,
     team,
@@ -37,11 +39,19 @@ export default function Results() {
 
   useEffect(() => {
     if (!name) return;
+    let active = true;
     fetch(`${import.meta.env.VITE_API_URL || ''}/api/leaderboard/update`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: resultId, name, score, correctAnswers, mode }),
-    }).catch(() => {});
-  }, [name, resultId, score, correctAnswers, mode]);
+    })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'The score could not be saved.');
+        if (active) setSaveStatus('saved');
+      })
+      .catch(() => { if (active) setSaveStatus('error'); });
+    return () => { active = false; };
+  }, [name, resultId, score, correctAnswers, mode, saveAttempt]);
 
   // Trigger confetti burst on load
   useEffect(() => {
@@ -114,9 +124,17 @@ export default function Results() {
           </div>
 
           <p className="text-xs sm:text-sm font-mono text-cyan-neon">
-            PROTOCOL COMPLETED // OFFICIAL SCORE DEPOSITED
+            PROTOCOL COMPLETED // {saveStatus === 'saved' ? 'SCORE SAVED' : saveStatus === 'saving' ? 'SAVING SCORE…' : 'SCORE NEEDS RETRY'}
           </p>
         </motion.div>
+
+        {saveStatus === 'error' && (
+          <div role="alert" className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-center text-sm text-rose-100">
+            Your result is not on the leaderboard yet. Check the connection and retry.
+            <button type="button" onClick={() => { setSaveStatus('saving'); setSaveAttempt((attempt) => attempt + 1); }} className="ml-2 underline underline-offset-4">Retry save</button>
+          </div>
+        )}
+        {saveStatus === 'saving' && <p role="status" className="text-center text-xs text-white/45">Saving your result to the shared leaderboard…</p>}
 
         {/* Big Score Card */}
         <div className="rounded-2xl border border-white/10 bg-navy-900/80 backdrop-blur-xl p-6 sm:p-8 shadow-2xl relative overflow-hidden text-center">
@@ -234,3 +252,4 @@ export default function Results() {
     </Layout>
   );
 }
+
