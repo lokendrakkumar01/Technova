@@ -54,7 +54,6 @@ export default function HostDashboard() {
     hostSkipQuestion,
     hostRevealAnswer,
     hostResetQuestion,
-    hostEndGame,
     hostAddPoints,
     hostRemovePoints,
     hostResetScore,
@@ -125,6 +124,19 @@ export default function HostDashboard() {
       setSharedGameState(result.state);
       setSharedGameError('');
     } catch (error) { setSharedGameError(error.message || 'Could not update pause state.'); }
+  };
+
+  const handleFinishGame = async () => {
+    try {
+      const response = await fetch('/api/host/game/finish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-host-token': hostToken },
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not end the shared game session.');
+      setSharedGameState(result.state);
+      setSharedGameError('');
+    } catch (error) { setSharedGameError(error.message || 'Could not end the shared game session.'); }
   };
 
   const deleteLeaderboardEntry = async (entry) => {
@@ -327,11 +339,11 @@ export default function HostDashboard() {
               <button
                 type="button"
                 onClick={() => void handleStartGame()}
-                disabled={isStartingGame}
+                disabled={isStartingGame || !sharedGameState.participants?.length}
                 className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-display font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
               >
                 <Play className="w-5 h-5 fill-current" />
-                {isStartingGame ? 'LOADING QUESTIONS…' : 'START GAME'}
+                {isStartingGame ? 'LOADING QUESTIONS…' : sharedGameState.participants?.length ? 'START GAME' : 'WAITING FOR PLAYERS'}
               </button>
 
               {/* Pause / Resume */}
@@ -550,8 +562,7 @@ export default function HostDashboard() {
                   type="button"
                   onClick={() => {
                     if (showConfirmModal === 'endGame') {
-                      hostEndGame();
-                      navigate('/results');
+                      void handleFinishGame();
                     } else if (showConfirmModal === 'resetScore') {
                       hostResetScore();
                     }
