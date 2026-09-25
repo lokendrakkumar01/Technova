@@ -16,7 +16,9 @@ import {
   Users,
   Trophy,
   Sliders,
-  AlertTriangle,$1  BadgeCheck,$1} from 'lucide-react';
+  AlertTriangle,
+  BadgeCheck,
+} from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import useGameStore from '../store/gameStore';
 
@@ -34,7 +36,9 @@ export default function HostDashboard() {
 
   const {
     gameStatus,
-$1$2    pendingRound,$2$3
+    currentRound,
+    pendingRound,
+    currentQuestionIndex,
     score,
     player,
     team,
@@ -44,7 +48,9 @@ $1$2    pendingRound,$2$3
     startGame,
     hostPause,
     hostResume,
-$1$2    hostApproveRound,$2    hostSkipQuestion,
+    nextQuestion,
+    hostApproveRound,
+    hostSkipQuestion,
     hostRevealAnswer,
     hostResetQuestion,
     hostEndGame,
