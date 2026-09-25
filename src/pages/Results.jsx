@@ -81,17 +81,17 @@ export default function Results() {
     frame();
   }, []);
 
-  const totalQuestionsDone = totalAnswered || (correctAnswers + wrongAnswers) || 30;
+  const totalQuestionsDone = totalAnswered || (correctAnswers + wrongAnswers) || 35;
   const accuracy = totalQuestionsDone > 0 ? ((correctAnswers / totalQuestionsDone) * 100).toFixed(1) : '0.0';
 
   const roundNames = {
     1: 'Code Language',
     2: 'Think Like A Computer',
-    3: 'Tech Arena',
-    showdown: 'Tech Showdown',
+    3: 'Emoji Decode',
+    4: 'Rapid Fire',
   };
 
-  const bestRound = strongestRound ? roundNames[strongestRound] || 'Tech Arena' : 'Tech Arena';
+  const bestRound = strongestRound ? roundNames[strongestRound] || 'Emoji Decode' : 'Emoji Decode';
 
   const handlePlayAgain = () => {
     resetGame();
@@ -209,7 +209,7 @@ export default function Results() {
             {Object.entries(roundScores).map(([rKey, rScore]) => (
               <div key={rKey} className="p-3 rounded-lg bg-navy-950/70 border border-white/5">
                 <div className="text-[10px] font-mono text-white/40 uppercase">
-                  {rKey === 'showdown' ? 'Showdown' : `Round ${rKey}`}
+                  {roundNames[rKey] || `Round ${rKey}`}
                 </div>
                 <div className="font-display font-bold text-xl text-cyan-neon mt-1">
                   {rScore} PTS
