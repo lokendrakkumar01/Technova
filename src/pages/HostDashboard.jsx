@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -34,6 +34,8 @@ export default function HostDashboard() {
   const [savedLeaderboardLoading, setSavedLeaderboardLoading] = useState(false);
   const [isStartingGame, setIsStartingGame] = useState(false);
   const [questionLoadError, setQuestionLoadError] = useState('');
+  const [sharedGameState, setSharedGameState] = useState({ status: 'registration', approvedRound: 1, pendingRound: null, hostPaused: false, participants: [] });
+  const [sharedGameError, setSharedGameError] = useState('');
 
   // Score adjust state
   const [pointsInput, setPointsInput] = useState(10);
@@ -48,12 +50,7 @@ export default function HostDashboard() {
     player,
     team,
     mode,
-    hostPaused,
-    startGame,
-    hostPause,
-    hostResume,
     nextQuestion,
-    hostApproveRound,
     hostSkipQuestion,
     hostRevealAnswer,
     hostResetQuestion,
@@ -80,9 +77,59 @@ export default function HostDashboard() {
     }
   };
 
+  const refreshSharedGameState = async (token = hostToken) => {
+    if (!token) return;
+    try {
+      const response = await fetch('/api/host/game/state', { cache: 'no-store', headers: { 'x-host-token': token } });
+      const state = await response.json();
+      if (!response.ok) throw new Error(state.error || 'Could not load live game state.');
+      setSharedGameState(state);
+      setSharedGameError('');
+    } catch (error) {
+      setSharedGameError(error.message || 'Could not load live participants.');
+    }
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated || !hostToken) return undefined;
+    void refreshSharedGameState(hostToken);
+    const timer = window.setInterval(() => void refreshSharedGameState(hostToken), 1800);
+    return () => window.clearInterval(timer);
+  }, [isAuthenticated, hostToken]);
+
+  const handleApproveRound = async () => {
+    const round = Number(sharedGameState.pendingRound);
+    if (!round || !hostToken) return;
+    try {
+      const response = await fetch('/api/host/round-approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-host-token': hostToken },
+        body: JSON.stringify({ round }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not approve the round.');
+      setSharedGameState(result.state);
+      setSharedGameError('');
+    } catch (error) { setSharedGameError(error.message || 'Could not approve the round.'); }
+  };
+
+  const handleTogglePause = async () => {
+    try {
+      const response = await fetch('/api/host/game/pause', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-host-token': hostToken },
+        body: JSON.stringify({ paused: !sharedGameState.hostPaused }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not update the game pause state.');
+      setSharedGameState(result.state);
+      setSharedGameError('');
+    } catch (error) { setSharedGameError(error.message || 'Could not update pause state.'); }
+  };
+
   const deleteLeaderboardEntry = async (entry) => {
     const id = String(entry?.id || '').trim();
-    if (!id || !window.confirm(`Delete ${entry.name}'s saved leaderboard result?`)) return;
+    if (!id || !window.confirm(`Remove ${entry.name} from the live session and saved leaderboard?`)) return;
     setSavedLeaderboardStatus('');
     try {
       const response = await fetch(`/api/host/leaderboard/${encodeURIComponent(id)}`, {
@@ -106,8 +153,20 @@ export default function HostDashboard() {
       setIsStartingGame(false);
       return;
     }
-    startGame();
-    navigate('/game');
+    try {
+      const response = await fetch('/api/host/game/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-host-token': hostToken },
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not start the shared game session.');
+      setSharedGameState(result.state);
+      setSharedGameError('');
+    } catch (error) {
+      setQuestionLoadError(error.message || 'Could not start the shared game session.');
+    } finally {
+      setIsStartingGame(false);
+    }
   };
 
   const handlePinSubmit = async (e) => {
@@ -251,14 +310,14 @@ export default function HostDashboard() {
               GAME FLOW MARSHAL ACTIONS
             </h2>
 
-            {gameStatus === 'roundApproval' && pendingRound && (
+            {sharedGameState.pendingRound && (
               <div className="flex flex-col gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="font-display text-sm font-bold text-amber-200">ROUND {pendingRound} IS READY FOR APPROVAL</p>
+                  <p className="font-display text-sm font-bold text-amber-200">ROUND {sharedGameState.pendingRound} IS READY FOR APPROVAL</p>
                   <p className="mt-1 text-xs text-white/55">Participants remain paused until the host approves the next round.</p>
                 </div>
-                <button type="button" onClick={() => { hostApproveRound(); navigate('/game'); }} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-400 px-4 py-2 font-display text-xs font-black tracking-wider text-slate-950 transition hover:bg-emerald-300">
-                  <BadgeCheck className="h-4 w-4" /> APPROVE ROUND {pendingRound}
+                <button type="button" onClick={() => void handleApproveRound()} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-400 px-4 py-2 font-display text-xs font-black tracking-wider text-slate-950 transition hover:bg-emerald-300">
+                  <BadgeCheck className="h-4 w-4" /> APPROVE ROUND {sharedGameState.pendingRound}
                 </button>
               </div>
             )}
@@ -278,15 +337,15 @@ export default function HostDashboard() {
               {/* Pause / Resume */}
               <button
                 type="button"
-                onClick={hostPaused ? hostResume : hostPause}
+                onClick={() => void handleTogglePause()}
                 className={`p-3 rounded-xl border font-display font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-                  hostPaused
+                  sharedGameState.hostPaused
                     ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
                     : 'border-amber-500/30 bg-amber-500/10 text-amber-400'
                 }`}
               >
-                {hostPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
-                {hostPaused ? 'RESUME GAME' : 'PAUSE GAME'}
+                {sharedGameState.hostPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+                {sharedGameState.hostPaused ? 'RESUME GAME' : 'PAUSE GAME'}
               </button>
 
               {/* Next Question */}
@@ -409,6 +468,30 @@ export default function HostDashboard() {
               </button>
             </div>
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-cyan-neon/20 bg-navy-900/70 p-6 backdrop-blur-md">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 font-display text-base font-bold tracking-wider text-white"><Users className="h-4 w-4 text-cyan-neon" /> LIVE PARTICIPANTS</h2>
+              <p className="mt-1 text-xs text-white/50">Shared across every device · {sharedGameState.participants?.length || 0} registered · Round {sharedGameState.approvedRound || 1}{sharedGameState.pendingRound ? " · Round " + sharedGameState.pendingRound + " awaiting approval" : ""}</p>
+            </div>
+            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-emerald-200">{sharedGameState.status || "registration"}</span>
+          </div>
+          {sharedGameError && <p role="alert" className="mb-3 rounded-lg border border-rose-400/20 bg-rose-400/10 p-3 text-xs text-rose-200">{sharedGameError}</p>}
+          {!sharedGameState.participants?.length ? <p className="py-7 text-center text-sm text-white/45">No participants have registered yet.</p> : (
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {[...sharedGameState.participants].sort((a, b) => Number(b.score) - Number(a.score)).map((item, index) => (
+                <div key={item.id || index} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                  <div className="min-w-0"><p className="truncate text-sm font-bold text-white">#{index + 1} {item.name}</p><p className="mt-1 text-[10px] uppercase tracking-wider text-white/45">{item.mode} · {item.correctAnswers || 0} correct · {item.totalAnswered || 0} answered</p></div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="font-display text-sm font-black text-cyan-neon">{item.score || 0} PTS</span>
+                    <button type="button" onClick={() => void deleteLeaderboardEntry(item)} aria-label={`Remove ${item.name} from the live game`} className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-rose-400/25 bg-rose-400/10 text-rose-300"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Saved Leaderboard Management */}
