@@ -100,9 +100,9 @@ const useGameStore = create(
         set({ questionBank: normalizedBank });
       },
 
-      registerPlayer: ({ name, college, department }) => {
+      registerPlayer: ({ name, college, department, id }) => {
         const playerCode = generateCode();
-        const playerId = `player_${Date.now()}`;
+        const playerId = id ? String(id) : `player_${Date.now()}`;
         const newPlayer = { id: playerId, name, college, department };
         const entry = {
           id: playerId,
@@ -122,9 +122,9 @@ const useGameStore = create(
         }));
       },
 
-      registerTeam: ({ teamName, captainName, members }) => {
+      registerTeam: ({ teamName, captainName, members, id }) => {
         const teamCode = generateCode();
-        const teamId = `team_${Date.now()}`;
+        const teamId = id ? String(id) : `team_${Date.now()}`;
         const newTeam = { id: teamId, name: teamName, captain: captainName, members };
         const entry = {
           id: teamId,
