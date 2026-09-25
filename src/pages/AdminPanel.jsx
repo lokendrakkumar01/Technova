@@ -56,6 +56,7 @@ export default function AdminPanel() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [questionBankStatus, setQuestionBankStatus] = useState('');
   const [durableStorage, setDurableStorage] = useState(null);
+  const [cloudinaryConfigured, setCloudinaryConfigured] = useState(null);
   const [newQuestion, setNewQuestion] = useState({
     round: 1,
     category: 'Code Language',
@@ -84,8 +85,13 @@ export default function AdminPanel() {
       if (!loaded) setQuestionBankStatus('Could not refresh saved questions from the server. Check the connection and retry.');
       fetch('/api/health', { cache: 'no-store' })
         .then((healthResponse) => healthResponse.ok ? healthResponse.json() : null)
-        .then((health) => { if (health) setDurableStorage(Boolean(health.durableStorage)); })
-        .catch(() => setDurableStorage(false));
+        .then((health) => {
+          if (health) {
+            setDurableStorage(Boolean(health.durableStorage));
+            setCloudinaryConfigured(Boolean(health.cloudinaryConfigured));
+          }
+        })
+        .catch(() => { setDurableStorage(false); setCloudinaryConfigured(false); });
     } catch (error) { setPinError(error.message || 'Could not connect to the server.'); }
   };
 
@@ -407,6 +413,8 @@ export default function AdminPanel() {
 
         {durableStorage === false && <div role="status" className="rounded-xl border border-amber-300/25 bg-amber-300/10 p-4 text-xs text-amber-100"><strong>Storage needs setup:</strong> this server is using local JSON files. Add a MongoDB connection in Render environment variables for reliable shared data that survives service restarts.</div>}
         {durableStorage === true && <div role="status" className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 p-3 text-xs text-emerald-100">Shared MongoDB storage is connected. Admin changes and completed scores are saved centrally.</div>}
+        {cloudinaryConfigured === false && <div role="status" className="rounded-xl border border-amber-300/25 bg-amber-300/10 p-4 text-xs text-amber-100"><strong>Cloud media storage needs setup:</strong> add the rotated Cloudinary credentials to Render as <code>CLOUDINARY_CLOUD_NAME</code>, <code>CLOUDINARY_API_KEY</code>, and <code>CLOUDINARY_API_SECRET</code>. The gallery currently falls back to server-local uploads.</div>}
+        {cloudinaryConfigured === true && <div role="status" className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 p-3 text-xs text-emerald-100">Cloudinary is configured for durable photo and video uploads.</div>}
         {questionBankStatus && <p role="status" className="text-xs text-cyan-neon">{questionBankStatus}</p>}
 
         <section className="rounded-2xl border border-white/10 bg-navy-900/70 overflow-hidden">

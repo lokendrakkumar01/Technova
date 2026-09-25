@@ -17,6 +17,7 @@ import {
   Trophy,
   Sliders,
   AlertTriangle,
+  BadgeCheck,
 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import useGameStore from '../store/gameStore';
@@ -36,6 +37,7 @@ export default function HostDashboard() {
   const {
     gameStatus,
     currentRound,
+    pendingRound,
     currentQuestionIndex,
     score,
     player,
@@ -47,6 +49,7 @@ export default function HostDashboard() {
     hostPause,
     hostResume,
     nextQuestion,
+    hostApproveRound,
     hostSkipQuestion,
     hostRevealAnswer,
     hostResetQuestion,
@@ -208,6 +211,18 @@ export default function HostDashboard() {
               <Sliders className="w-4 h-4 text-cyan-neon" />
               GAME FLOW MARSHAL ACTIONS
             </h2>
+
+            {gameStatus === 'roundApproval' && pendingRound && (
+              <div className="flex flex-col gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-display text-sm font-bold text-amber-200">ROUND {pendingRound} IS READY FOR APPROVAL</p>
+                  <p className="mt-1 text-xs text-white/55">Participants remain paused until the host approves the next round.</p>
+                </div>
+                <button type="button" onClick={() => { hostApproveRound(); navigate('/game'); }} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-400 px-4 py-2 font-display text-xs font-black tracking-wider text-slate-950 transition hover:bg-emerald-300">
+                  <BadgeCheck className="h-4 w-4" /> APPROVE ROUND {pendingRound}
+                </button>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {/* Start Game */}
