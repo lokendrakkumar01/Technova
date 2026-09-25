@@ -122,7 +122,7 @@ export default function ReadyScreen() {
               className="w-full btn-primary py-4 text-base tracking-[0.2em] uppercase flex items-center justify-center gap-3 cursor-pointer shadow-neon-cyan disabled:opacity-60"
             >
               <Play className="w-5 h-5 fill-current" />
-              <span>{isLaunching ? 'LOADING CURRENT QUESTIONS…' : 'START GAME PROTOCOL'}</span>
+              <span>{isLaunching ? 'LOADING CURRENT QUESTIONS…' : 'JOIN THE GAME LOBBY'}</span>
             </motion.button>
             {questionLoadError && <p role="alert" className="mt-3 text-center text-xs text-rose-300">{questionLoadError}</p>}
           </div>
