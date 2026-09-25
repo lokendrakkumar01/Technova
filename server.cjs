@@ -189,15 +189,22 @@ app.get('/api/questions', async (req, res) => {
 app.put('/api/questions', requireAdmin, async (req, res) => {
   const questions = req.body?.questions;
   if (!Array.isArray(questions) || questions.length < 1 || questions.length > 200 || questions.some((q) =>
-    !q || ![1, 2, 3].includes(Number(q.round)) || !Array.isArray(q.options) || q.options.length !== 4 ||
+    !q || ![1, 2, 3, 4].includes(Number(q.round)) || !Array.isArray(q.options) || q.options.length !== 4 ||
     q.options.some((option) => typeof option !== 'string' || !option.trim()) ||
     typeof q.correctAnswer !== 'string' || !q.options.includes(q.correctAnswer) ||
     typeof q.pictogram !== 'string' || !q.pictogram.trim() || typeof q.question !== 'string' || !q.question.trim()
-  )) return res.status(400).json({ error: 'Question bank contains an invalid question.' });
+  ) || [1, 2, 3, 4].some((round) => !questions.some((question) => Number(question.round) === round))) return res.status(400).json({ error: 'Question bank must contain valid questions in all four rounds.' });
   try {
-    if (isMongoConnected && db) await db.collection('settings').replaceOne({ _id: 'question-bank' }, { _id: 'question-bank', questions, updatedAt: new Date() }, { upsert: true });
-    else writeLocalData('questions.json', questions);
-    res.json({ success: true, count: questions.length });
+    const roundPoints = { 2: 15, 3: 20, 4: 30 };
+    const normalizedQuestions = questions.map((question) => ({
+      ...question,
+      round: Number(question.round),
+      points: roundPoints[Number(question.round)] ?? Math.max(0, Number(question.points) || 10),
+      answerMode: ({ 1: 'choice', 2: 'text', 3: 'emoji', 4: 'text' })[Number(question.round)],
+    }));
+    if (isMongoConnected && db) await db.collection('settings').replaceOne({ _id: 'question-bank' }, { _id: 'question-bank', questions: normalizedQuestions, updatedAt: new Date() }, { upsert: true });
+    else writeLocalData('questions.json', normalizedQuestions);
+    res.json({ success: true, count: normalizedQuestions.length });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
