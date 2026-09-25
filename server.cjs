@@ -142,6 +142,8 @@ app.get('/api/health', (req, res) => {
     status: 'online',
     appName: 'TECHDECODE Game Show Engine',
     mongoConnected: isMongoConnected,
+    storage: isMongoConnected ? 'mongodb' : 'local-json',
+    durableStorage: isMongoConnected,
     timestamp: new Date().toISOString(),
   });
 });
@@ -199,25 +201,51 @@ app.get('/api/leaderboard', async (req, res) => {
     if (isMongoConnected && db) {
       const scores = await db
         .collection('leaderboard')
-        .find()
+        .find({ id: { $not: /^demo/i }, isDemo: { $ne: true } })
         .sort({ score: -1 })
         .limit(50)
         .toArray();
       return res.json(scores);
     }
 
-    res.json(localLeaderboard.sort((a, b) => Number(b.score) - Number(a.score)).slice(0, 50));
+    const realScores = localLeaderboard.filter((entry) => !entry?.isDemo && !/^demo/i.test(String(entry?.id || '')));
+    res.json(realScores.sort((a, b) => Number(b.score) - Number(a.score)).slice(0, 50));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+app.delete('/api/admin/leaderboard/:id', requireAdmin, async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id || id.length > 160) return res.status(400).json({ error: 'A valid result ID is required.' });
+  try {
+    if (isMongoConnected && db) {
+      const result = await db.collection('leaderboard').deleteOne({ id });
+      return res.json({ success: true, deleted: result.deletedCount });
+    }
+    const previousLength = localLeaderboard.length;
+    localLeaderboard = localLeaderboard.filter((entry) => String(entry.id) !== id);
+    writeLocalData('leaderboard.json', localLeaderboard);
+    res.json({ success: true, deleted: previousLength - localLeaderboard.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/leaderboard/update', async (req, res) => {
   try {
     const { id, name, score, correctAnswers, mode } = req.body;
-    if (!name) return res.status(400).json({ error: 'Name required' });
+    const cleanName = typeof name === 'string' ? name.trim().slice(0, 80) : '';
+    const cleanScore = Number(score);
+    if (!cleanName) return res.status(400).json({ error: 'Name required' });
+    if (!Number.isFinite(cleanScore) || cleanScore < 0 || cleanScore > 1000000) return res.status(400).json({ error: 'Score must be a valid non-negative number.' });
 
-    const entry = { id: id || name, name, score: Number(score) || 0, correctAnswers: Number(correctAnswers) || 0, mode: mode || 'individual', updatedAt: new Date() };
+    const entry = {
+      id: typeof id === 'string' && id.trim() ? id.trim().slice(0, 160) : cleanName,
+      name: cleanName,
+      score: cleanScore,
+      correctAnswers: Math.max(0, Math.min(10000, Number(correctAnswers) || 0)),
+      mode: mode === 'team' ? 'team' : 'individual',
+      updatedAt: new Date(),
+    };
     if (isMongoConnected && db) {
       await db.collection('leaderboard').updateOne(
         { id: entry.id },
@@ -229,7 +257,7 @@ app.post('/api/leaderboard/update', async (req, res) => {
       writeLocalData('leaderboard.json', localLeaderboard);
     }
 
-    res.json({ success: true, name, score });
+    res.json({ success: true, entry });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -372,3 +400,4 @@ app.listen(PORT, () => {
   console.log(`>>> TECHDECODE Production Server running on port ${PORT} <<<`);
   console.log(`>>> Health check: http://localhost:${PORT}/api/health <<<`);
 });
+
