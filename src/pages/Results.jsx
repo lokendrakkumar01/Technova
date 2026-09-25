@@ -7,7 +7,6 @@ import {
   Award,
   Zap,
   RotateCcw,
-  Home,
   BarChart2,
   CheckCircle,
   Clock,
@@ -34,6 +33,15 @@ export default function Results() {
   } = useGameStore();
 
   const name = mode === 'team' ? team?.name : player?.name;
+  const resultId = (mode === 'team' ? team?.id : player?.id) || name;
+
+  useEffect(() => {
+    if (!name) return;
+    fetch(`${import.meta.env.VITE_API_URL || ''}/api/leaderboard/update`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: resultId, name, score, correctAnswers, mode }),
+    }).catch(() => {});
+  }, [name, resultId, score, correctAnswers, mode]);
 
   // Trigger confetti burst on load
   useEffect(() => {
@@ -92,7 +100,7 @@ export default function Results() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-amber-400/40 bg-amber-400/10 text-amber-300 font-display text-xs tracking-widest uppercase">
             <Trophy className="w-4 h-4 text-amber-300" />
-            TECHNOVA CONTEST CEREMONY
+            TECHDECODE CONTEST CEREMONY
           </div>
 
           <div className="text-6xl sm:text-7xl">🏆</div>

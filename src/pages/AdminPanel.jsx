@@ -1,31 +1,31 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Lock,
   Plus,
   Trash2,
   Edit,
-  Save,
   FileUp,
   Download,
-  CheckCircle,
-  HelpCircle,
   Layers,
-  ArrowLeft,
   Search,
 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
-import { QUESTIONS as INITIAL_QUESTIONS } from '../data/questions';
+import useGameStore from '../store/gameStore';
+
+const EMOJI_OPTIONS = ['💻', '⌨️', '🐍', '⚙️', '🧠', '🤖', '🔒', '🌐', '☁️', '📱', '📊', '🔗', '🧩', '⚡'];
+const isValidQuestion = (q) => q && [1, 2, 3].includes(Number(q.round)) &&
+  Array.isArray(q.options) && q.options.length === 4 && q.options.every((option) => typeof option === 'string' && option.trim()) &&
+  typeof q.correctAnswer === 'string' && q.options.includes(q.correctAnswer) &&
+  typeof q.pictogram === 'string' && q.pictogram.trim() && typeof q.question === 'string' && q.question.trim();
 
 export default function AdminPanel() {
-  const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
-  const [pinError, setPinError] = useState(false);
-
-  // Question Management State
-  const [questions, setQuestions] = useState(INITIAL_QUESTIONS);
+  const [adminToken, setAdminToken] = useState('');
+  const [pinError, setPinError] = useState('');
+  const questions = useGameStore((state) => state.questionBank);
+  const saveQuestionBank = useGameStore((state) => state.saveQuestionBank);
   const [filterRound, setFilterRound] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState(null);
@@ -33,6 +33,12 @@ export default function AdminPanel() {
 
   // New Question Form
   const [showAddModal, setShowAddModal] = useState(false);
+  const [mediaType, setMediaType] = useState('photo');
+  const [mediaFile, setMediaFile] = useState(null);
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaTitle, setMediaTitle] = useState('');
+  const [mediaDescription, setMediaDescription] = useState('');
+  const [mediaStatus, setMediaStatus] = useState('');
   const [newQuestion, setNewQuestion] = useState({
     round: 1,
     category: 'Code Language',
@@ -46,14 +52,16 @@ export default function AdminPanel() {
     hint: '',
   });
 
-  const handlePinSubmit = (e) => {
+  const handlePinSubmit = async (e) => {
     e.preventDefault();
-    if (pin === '9999') {
+    setPinError('');
+    try {
+      const response = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Admin sign-in failed.');
+      setAdminToken(result.token);
       setIsAuthenticated(true);
-      setPinError(false);
-    } else {
-      setPinError(true);
-    }
+    } catch (error) { setPinError(error.message || 'Could not connect to the server.'); }
   };
 
   const handleStartEdit = (q) => {
@@ -61,26 +69,30 @@ export default function AdminPanel() {
     setEditFormData({ ...q });
   };
 
-  const handleSaveEdit = () => {
-    setQuestions(questions.map((q) => (q.id === editingId ? editFormData : q)));
-    setEditingId(null);
+  const commitQuestions = async (nextQuestions) => {
+    try { await saveQuestionBank([...nextQuestions].sort((a, b) => Number(a.round) - Number(b.round)), adminToken); return true; }
+    catch (error) { alert(error.message); return false; }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!isValidQuestion(editFormData)) { alert('Choose four options and make the correct answer one of them.'); return; }
+    if (await commitQuestions(questions.map((q) => (q.id === editingId ? editFormData : q)))) setEditingId(null);
   };
 
   const handleDelete = (id) => {
     if (window.confirm('Delete this question from active bank?')) {
-      setQuestions(questions.filter((q) => q.id !== id));
+      void commitQuestions(questions.filter((q) => q.id !== id));
     }
   };
 
   const handleCreateQuestion = (e) => {
     e.preventDefault();
-    const created = {
-      ...newQuestion,
-      id: Date.now(),
-    };
-    setQuestions([...questions, created]);
-    setShowAddModal(false);
-    setNewQuestion({
+    const created = { ...newQuestion, id: Date.now(), options: newQuestion.options.map((option) => option.trim()), correctAnswer: newQuestion.correctAnswer.trim() };
+    if (!isValidQuestion(created)) { alert('Choose four options and make the correct answer one of them.'); return; }
+    void commitQuestions([...questions, created]).then((saved) => {
+      if (saved) {
+        setShowAddModal(false);
+        setNewQuestion({
       round: 1,
       category: 'Code Language',
       difficulty: 'medium',
@@ -91,6 +103,8 @@ export default function AdminPanel() {
       explanation: '',
       points: 20,
       hint: '',
+        });
+      }
     });
   };
 
@@ -98,7 +112,7 @@ export default function AdminPanel() {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(questions, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', 'technova_questions.json');
+    downloadAnchor.setAttribute('download', 'TECHDECODE_questions.json');
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -111,15 +125,35 @@ export default function AdminPanel() {
     reader.onload = (evt) => {
       try {
         const parsed = JSON.parse(evt.target.result);
-        if (Array.isArray(parsed)) {
-          setQuestions(parsed);
-          alert(`Successfully imported ${parsed.length} questions!`);
-        }
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(isValidQuestion)) {
+          void commitQuestions(parsed).then((saved) => { if (saved) alert(`Successfully imported ${parsed.length} questions!`); });
+        } else { alert('Every question needs a round, pictogram, four options, and a correct answer from those options.'); }
       } catch {
         alert('Invalid JSON file format.');
       }
     };
     reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleMediaSubmit = async (e) => {
+    e.preventDefault();
+    setMediaStatus('');
+    try {
+      let response;
+      if (mediaType === 'photo' || mediaType === 'video') {
+        if (!mediaFile) throw new Error('Choose a photo or video to upload.');
+        const body = new FormData();
+        body.append('media', mediaFile); body.append('type', mediaType); body.append('title', mediaTitle); body.append('description', mediaDescription);
+        response = await fetch('/api/memories/upload', { method: 'POST', headers: { 'x-admin-token': adminToken }, body });
+      } else {
+        response = await fetch(`/api/memories/${mediaType}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken }, body: JSON.stringify({ url: mediaUrl, title: mediaTitle, description: mediaDescription }) });
+      }
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not save media.');
+      setMediaStatus('Saved. It is now available in the Memories gallery.');
+      setMediaFile(null); setMediaUrl(''); setMediaTitle(''); setMediaDescription('');
+    } catch (error) { setMediaStatus(error.message); }
   };
 
   if (!isAuthenticated) {
@@ -151,12 +185,12 @@ export default function AdminPanel() {
                     setPin(e.target.value);
                     setPinError(false);
                   }}
-                  placeholder="Admin PIN (Default: 9999)"
+                  placeholder="Admin PIN"
                   className="w-full px-4 py-3 text-center tracking-[0.5em] font-mono text-lg rounded-xl bg-navy-950/80 border border-white/15 text-white placeholder-white/20 focus:outline-none focus:border-purple-soft"
                 />
                 {pinError && (
                   <p className="text-xs text-rose-400 mt-2 font-mono">
-                    SECURITY REJECTED // ACCESS DENIED
+                    {pinError}
                   </p>
                 )}
               </div>
@@ -194,7 +228,7 @@ export default function AdminPanel() {
               QUESTION REPOSITORY ENGINE
             </div>
             <h1 className="font-display font-black text-2xl sm:text-3xl text-white tracking-wider">
-              TECHNOVA QUESTION VAULT
+              TECHDECODE QUESTION VAULT
             </h1>
           </div>
 
@@ -231,6 +265,18 @@ export default function AdminPanel() {
           </div>
         </div>
 
+        <section className="rounded-xl border border-white/10 bg-navy-900/70 p-4 sm:p-6 space-y-4">
+          <div><h2 className="font-display text-lg font-bold text-white">MEMORIES MEDIA</h2><p className="text-xs text-white/50">Upload photos, videos, YouTube clips, or external links. Saved items appear in the public gallery.</p></div>
+          <form onSubmit={handleMediaSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+            <label className="text-xs text-white/60">Type<select value={mediaType} onChange={(e) => setMediaType(e.target.value)} className="mt-1 w-full p-2 rounded bg-navy-950 border border-white/15 text-white"><option value="photo">Photo</option><option value="video">Video</option><option value="youtube">YouTube link</option><option value="link">External link</option></select></label>
+            {(mediaType === 'photo' || mediaType === 'video') ? <label className="text-xs text-white/60">Media file<input required type="file" accept={mediaType === 'photo' ? 'image/*' : 'video/*'} onChange={(e) => setMediaFile(e.target.files?.[0] || null)} className="mt-1 w-full text-xs text-white" /></label> : <label className="text-xs text-white/60">Link URL<input required type="url" value={mediaUrl} onChange={(e) => setMediaUrl(e.target.value)} placeholder="https://..." className="mt-1 w-full p-2 rounded bg-navy-950 border border-white/15 text-white" /></label>}
+            <label className="text-xs text-white/60">Title<input value={mediaTitle} onChange={(e) => setMediaTitle(e.target.value)} className="mt-1 w-full p-2 rounded bg-navy-950 border border-white/15 text-white" /></label>
+            <label className="text-xs text-white/60">Description<input value={mediaDescription} onChange={(e) => setMediaDescription(e.target.value)} className="mt-1 w-full p-2 rounded bg-navy-950 border border-white/15 text-white" /></label>
+            <button type="submit" className="btn-primary p-2 text-xs font-bold">SAVE TO GALLERY</button>
+          </form>
+          {mediaStatus && <p role="status" className="text-xs text-cyan-neon">{mediaStatus}</p>}
+        </section>
+
         {/* Filter and Search Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-navy-900/60 border border-white/10">
           <div className="flex items-center gap-2">
@@ -266,8 +312,6 @@ export default function AdminPanel() {
         {/* Questions Grid/Table */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((q) => {
-            const isEditing = editingId === q.id;
-
             return (
               <div
                 key={q.id}
@@ -323,6 +367,27 @@ export default function AdminPanel() {
             );
           })}
         </div>
+
+        {editingId !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+            <form onSubmit={(e) => { e.preventDefault(); void handleSaveEdit(); }} className="max-w-2xl w-full rounded-2xl border border-white/20 bg-navy-950 p-5 sm:p-6 space-y-3 my-8 max-h-[90vh] overflow-y-auto">
+              <h2 className="font-display text-xl font-bold text-white">EDIT QUESTION</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="text-xs text-white/60">Round<select value={editFormData.round || 1} onChange={(e) => setEditFormData({ ...editFormData, round: Number(e.target.value) })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white"><option value={1}>Round 1</option><option value={2}>Round 2</option><option value={3}>Round 3</option></select></label>
+                <label className="text-xs text-white/60">Difficulty<select value={editFormData.difficulty || 'medium'} onChange={(e) => setEditFormData({ ...editFormData, difficulty: e.target.value })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white"><option>easy</option><option>medium</option><option>hard</option></select></label>
+                <label className="text-xs text-white/60 sm:col-span-2">Pictogram<input required value={editFormData.pictogram || ''} onChange={(e) => setEditFormData({ ...editFormData, pictogram: e.target.value })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white" /></label>
+                <div className="sm:col-span-2 flex flex-wrap gap-1">{EMOJI_OPTIONS.map((emoji) => <button key={emoji} type="button" onClick={() => setEditFormData({ ...editFormData, pictogram: (editFormData.pictogram || '') + emoji })} className="rounded bg-white/10 px-2 py-1 text-lg" aria-label={`Add ${emoji} to pictogram`}>{emoji}</button>)}</div>
+                <label className="text-xs text-white/60 sm:col-span-2">Question<input required value={editFormData.question || ''} onChange={(e) => setEditFormData({ ...editFormData, question: e.target.value })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white" /></label>
+                <label className="text-xs text-white/60">Correct answer<select value={editFormData.correctAnswer || ''} onChange={(e) => setEditFormData({ ...editFormData, correctAnswer: e.target.value })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white">{(editFormData.options || []).map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+                <label className="text-xs text-white/60">Points<input type="number" min="0" value={editFormData.points || 0} onChange={(e) => setEditFormData({ ...editFormData, points: Number(e.target.value) })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white" /></label>
+                {(editFormData.options || []).map((option, index) => <label key={index} className="text-xs text-white/60">Option {index + 1}<input required value={option} onChange={(e) => { const options = [...editFormData.options]; options[index] = e.target.value; setEditFormData({ ...editFormData, options, ...(editFormData.correctAnswer === option ? { correctAnswer: e.target.value } : {}) }); }} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white" /></label>)}
+                <label className="text-xs text-white/60">Hint<input value={editFormData.hint || ''} onChange={(e) => setEditFormData({ ...editFormData, hint: e.target.value })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white" /></label>
+                <label className="text-xs text-white/60 sm:col-span-2">Explanation<textarea rows={3} value={editFormData.explanation || ''} onChange={(e) => setEditFormData({ ...editFormData, explanation: e.target.value })} className="mt-1 w-full p-2 rounded bg-navy-900 border border-white/15 text-white" /></label>
+              </div>
+              <div className="flex gap-3"><button type="button" onClick={() => setEditingId(null)} className="flex-1 p-2 rounded border border-white/15 text-white">CANCEL</button><button type="submit" className="flex-1 btn-primary p-2">SAVE CHANGES</button></div>
+            </form>
+          </div>
+        )}
 
         {/* Add Question Modal */}
         {showAddModal && (
@@ -389,6 +454,7 @@ export default function AdminPanel() {
                     placeholder="e.g. 🐍 + 💻"
                     className="w-full p-2 rounded bg-navy-900 border border-white/15 text-white text-base"
                   />
+                  <div className="mt-2 flex flex-wrap gap-1">{EMOJI_OPTIONS.map((emoji) => <button key={emoji} type="button" onClick={() => setNewQuestion({ ...newQuestion, pictogram: newQuestion.pictogram + emoji })} className="rounded bg-white/10 px-2 py-1 text-lg" aria-label={`Add ${emoji} to pictogram`}>{emoji}</button>)}</div>
                 </div>
 
                 <div>

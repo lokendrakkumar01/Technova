@@ -1,23 +1,17 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Volume2,
   VolumeX,
-  Zap,
-  HelpCircle,
-  Clock,
   Sparkles,
   Trophy,
-  AlertCircle,
   Pause,
-  Play,
-  RotateCcw,
 } from 'lucide-react';
 import useGameStore from '../store/gameStore';
 import useTimer from '../hooks/useTimer';
 import useSound from '../hooks/useSound';
-import { ROUND_CONFIGS, QUESTIONS, SHOWDOWN_QUESTIONS } from '../data/questions';
+import { ROUND_CONFIGS, SHOWDOWN_QUESTIONS } from '../data/questions';
 
 import PictogramDisplay from '../components/game/PictogramDisplay';
 import AnswerButtons from '../components/game/AnswerButtons';
@@ -38,9 +32,6 @@ export default function GameScreen() {
     currentQuestionIndex,
     phase,
     score,
-    correctAnswers,
-    wrongAnswers,
-    totalAnswered,
     selectedAnswer,
     isAnswerLocked,
     answerResult,
@@ -52,7 +43,6 @@ export default function GameScreen() {
     extraTimeAmount,
     inShowdown,
     showdownIndex,
-    showdownComplete,
     scoreDelta,
     soundEnabled,
     hostPaused,
@@ -61,10 +51,10 @@ export default function GameScreen() {
     selectAnswer,
     timeout,
     nextQuestion,
-    useFiftyFifty,
-    useTechHint,
-    useExtraTime,
-    clearExtraTime,
+    activateFiftyFifty,
+    activateTechHint,
+    activateExtraTime,
+    questionBank,
     toggleSound,
     getCurrentQuestion,
   } = useGameStore();
@@ -105,7 +95,9 @@ export default function GameScreen() {
   const { timeLeft, timerState, progress, getTimeUsed } = useTimer({
     duration: baseDuration,
     onTimeout: handleTimeout,
-    isActive: phase === 'question' && !isAnswerLocked && !hostPaused && gameStatus === 'playing',
+    isActive: phase === 'question' && !isAnswerLocked && gameStatus === 'playing',
+    isPaused: hostPaused,
+    questionKey: `${inShowdown ? 'showdown' : currentQuestionIndex}:${question?.id}`,
     extraTime: extraTimeAmount,
   });
 
@@ -130,22 +122,22 @@ export default function GameScreen() {
   };
 
   const handleLifelineExtraTime = () => {
-    useExtraTime();
+    activateExtraTime();
     play('click');
   };
 
   const handleLifelineHint = () => {
-    useTechHint();
+    activateTechHint();
     play('click');
   };
 
   const handleLifelineFiftyFifty = () => {
-    useFiftyFifty();
+    activateFiftyFifty();
     play('click');
   };
 
   // Question numbering
-  const totalQuestionsCount = inShowdown ? SHOWDOWN_QUESTIONS.length : QUESTIONS.length;
+  const totalQuestionsCount = inShowdown ? SHOWDOWN_QUESTIONS.length : questionBank.length;
   const currentNumber = inShowdown ? showdownIndex + 1 : currentQuestionIndex + 1;
   const roundConfig = inShowdown ? ROUND_CONFIGS.showdown : (ROUND_CONFIGS[currentRound] || ROUND_CONFIGS[1]);
 
@@ -166,7 +158,7 @@ export default function GameScreen() {
               onClick={() => navigate('/')}
               className="font-display font-black text-xl tracking-wider text-cyan-neon hover:text-white transition-colors"
             >
-              TECHNOVA
+              TECHDECODE
             </button>
             <div className="hidden sm:block h-4 w-px bg-white/20" />
             <div className="hidden sm:flex items-center gap-1.5 text-xs font-mono text-white/70">
@@ -339,7 +331,7 @@ export default function GameScreen() {
 
       {/* ─── FOOTER BAR ────────────────────────────────────────── */}
       <footer className="relative z-10 border-t border-white/5 bg-navy-950/80 px-4 py-2 text-center text-[11px] font-mono text-white/40">
-        <span>TECHNOVA GAME ENGINE // LIVE COMPETITION RUNTIME</span>
+        <span>TECHDECODE GAME ENGINE // LIVE COMPETITION RUNTIME</span>
       </footer>
 
       {/* ─── OVERLAYS ──────────────────────────────────────────── */}

@@ -169,7 +169,7 @@ export default function Navbar() {
             <Link
               to="/"
               className="flex items-center gap-2 group select-none"
-              aria-label="TECHNOVA Home"
+              aria-label="TECHDECODE Home"
             >
               {/* Animated hexagon badge */}
               <motion.div
@@ -198,7 +198,7 @@ export default function Navbar() {
                   backgroundClip: 'text',
                 }}
               >
-                TECHNOVA
+                TECHDECODE
               </span>
             </Link>
 

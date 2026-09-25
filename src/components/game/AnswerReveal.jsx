@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, XCircle, Clock, ArrowRight, Award, Zap } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, ArrowRight, Zap } from 'lucide-react';
 
 export default function AnswerReveal({
   question,

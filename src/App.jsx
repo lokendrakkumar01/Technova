@@ -1,20 +1,21 @@
-import React from 'react'
+import React, { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 
 // Page imports
-import LandingPage from './pages/LandingPage'
-import HowToPlay from './pages/HowToPlay'
-import ModeSelection from './pages/ModeSelection'
-import Registration from './pages/Registration'
-import ReadyScreen from './pages/ReadyScreen'
-import GameScreen from './pages/GameScreen'
-import HostDashboard from './pages/HostDashboard'
-import ProjectorMode from './pages/ProjectorMode'
-import Leaderboard from './pages/Leaderboard'
-import Results from './pages/Results'
-import AdminPanel from './pages/AdminPanel'
-import Memories from './pages/Memories'
+const LandingPage = lazy(() => import('./pages/LandingPage'))
+const HowToPlay = lazy(() => import('./pages/HowToPlay'))
+const ModeSelection = lazy(() => import('./pages/ModeSelection'))
+const Registration = lazy(() => import('./pages/Registration'))
+const ReadyScreen = lazy(() => import('./pages/ReadyScreen'))
+const GameScreen = lazy(() => import('./pages/GameScreen'))
+const HostDashboard = lazy(() => import('./pages/HostDashboard'))
+const ProjectorMode = lazy(() => import('./pages/ProjectorMode'))
+const Leaderboard = lazy(() => import('./pages/Leaderboard'))
+const Results = lazy(() => import('./pages/Results'))
+const AdminPanel = lazy(() => import('./pages/AdminPanel'))
+const Memories = lazy(() => import('./pages/Memories'))
+import useGameStore from './store/gameStore'
 
 // ─── Inline 404 Component ─────────────────────────────────────────────────────
 function NotFound() {
@@ -83,8 +84,12 @@ function NotFound() {
 
 // ─── App Router ───────────────────────────────────────────────────────────────
 export default function App() {
+  const loadQuestionBank = useGameStore((state) => state.loadQuestionBank);
+  useEffect(() => { void loadQuestionBank(); }, [loadQuestionBank]);
+
   return (
     <BrowserRouter>
+      <Suspense fallback={<div className="min-h-screen bg-[#020818] text-cyan-neon flex items-center justify-center font-mono">LOADING TECHDECODE...</div>}>
       <Routes>
         <Route path="/"               element={<LandingPage />} />
         <Route path="/how-to-play"    element={<HowToPlay />} />
@@ -97,9 +102,13 @@ export default function App() {
         <Route path="/leaderboard"    element={<Leaderboard />} />
         <Route path="/results"        element={<Results />} />
         <Route path="/admin"          element={<AdminPanel />} />
+        <Route path="/admin-login"    element={<AdminPanel />} />
+        <Route path="/admin%20login" element={<AdminPanel />} />
+        <Route path="/Admin login"   element={<AdminPanel />} />
         <Route path="/memories"       element={<Memories />} />
         <Route path="*"               element={<NotFound />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }

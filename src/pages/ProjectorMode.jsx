@@ -1,12 +1,10 @@
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import React from 'react';
+import { motion } from 'framer-motion';
 import useGameStore from '../store/gameStore';
 import useTimer from '../hooks/useTimer';
 import { ROUND_CONFIGS, QUESTIONS, SHOWDOWN_QUESTIONS } from '../data/questions';
 
 export default function ProjectorMode() {
-  const navigate = useNavigate();
   const {
     currentRound,
     currentQuestionIndex,
@@ -14,7 +12,6 @@ export default function ProjectorMode() {
     gameStatus,
     phase,
     selectedAnswer,
-    answerResult,
     inShowdown,
     showdownIndex,
     getCurrentQuestion,
@@ -39,7 +36,7 @@ export default function ProjectorMode() {
       <header className="flex items-center justify-between border-b border-white/20 pb-6 relative z-10">
         <div className="flex items-center gap-6">
           <div className="font-display font-black text-4xl sm:text-6xl text-cyan-neon tracking-widest drop-shadow-[0_0_30px_rgba(0,245,255,0.7)]">
-            TECHNOVA
+            TECHDECODE
           </div>
           <div className="h-10 w-0.5 bg-white/20" />
           <div className="font-display text-2xl sm:text-3xl font-bold tracking-widest text-purple-soft uppercase">

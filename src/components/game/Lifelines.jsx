@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, HelpCircle, Clock, Check } from 'lucide-react';
+import { Sparkles, Clock, Check } from 'lucide-react';
 
 export default function Lifelines({
   lifelines = {},

@@ -1,13 +1,13 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Zap, Play, Trophy, Users, User, ArrowLeft, ShieldCheck, HelpCircle } from 'lucide-react';
+import { Play, Trophy, Users, User, ArrowLeft } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import useGameStore from '../store/gameStore';
 
 export default function ReadyScreen() {
   const navigate = useNavigate();
-  const { player, team, playerCode, mode, startGame, leaderboard } = useGameStore();
+  const { player, team, playerCode, mode, startGame, leaderboard, loadQuestionBank } = useGameStore();
 
   const name = mode === 'team' ? team?.name : player?.name;
 
@@ -18,7 +18,8 @@ export default function ReadyScreen() {
     }
   }, [player, team, navigate]);
 
-  const handleLaunch = () => {
+  const handleLaunch = async () => {
+    await loadQuestionBank();
     startGame();
     navigate('/game');
   };
