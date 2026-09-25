@@ -12,9 +12,8 @@ const initialState = {
   playerCode: null,
 
   // Game status
-  gameStatus: 'idle', // idle | registration | ready | playing | roundTransition | showdown | finished | paused
-  currentRound: 1,
-  currentQuestionIndex: 0, // 0-based index within the full QUESTIONS array
+  gameStatus: 'idle', // idle | registration | ready | playing | roundApproval | roundTransition | showdown | finished | paused
+$1$2  pendingRound: null,$2$3 0, // 0-based index within the full QUESTIONS array
   phase: 'question', // 'question' | 'reveal' | 'roundEnd'
 
   // Scoring
@@ -146,8 +145,7 @@ const useGameStore = create(
       // ─── GAME FLOW ───────────────────────────────────────────────────────
       startGame: () => set({
         gameStatus: 'roundTransition',
-        currentRound: 1,
-        currentQuestionIndex: 0,
+$1$2        pendingRound: null,$2$3 0,
         score: 0,
         correctAnswers: 0,
         wrongAnswers: 0,
@@ -294,17 +292,8 @@ const useGameStore = create(
           const strongest = Object.entries(roundScores).reduce((a, b) => b[1] > a[1] ? b : a, ['1', 0]);
           set({ gameStatus: 'finished', strongestRound: strongest[0] });        } else if (roundChanged) {
           set({
-            currentQuestionIndex: nextIdx,
-            currentRound: nextQ.round,
-            gameStatus: 'roundTransition',
-            selectedAnswer: null,
-            isAnswerLocked: false,
-            answerResult: null,
-            hintShown: false,
-            hintText: null,
-            eliminatedOptions: [],
-            extraTimeAmount: 0,
-            phase: 'question',
+            pendingRound: Number(nextQ.round),
+            gameStatus: 'roundApproval',
           });
         } else {
           set({
@@ -364,6 +353,26 @@ const useGameStore = create(
       hostPause: () => set({ hostPaused: true }),
       hostResume: () => set({ hostPaused: false }),
       hostNextQuestion: () => { get().nextQuestion(); },
+      hostApproveRound: () => {
+        const { gameStatus, pendingRound, currentQuestionIndex, questionBank } = get();
+        if (gameStatus !== 'roundApproval' || !pendingRound) return;
+        const nextQuestionIndex = currentQuestionIndex + 1;
+        if (!questionBank[nextQuestionIndex] || Number(questionBank[nextQuestionIndex].round) !== Number(pendingRound)) return;
+        set({
+          currentQuestionIndex: nextQuestionIndex,
+          currentRound: Number(pendingRound),
+          pendingRound: null,
+          gameStatus: 'roundTransition',
+          selectedAnswer: null,
+          isAnswerLocked: false,
+          answerResult: null,
+          hintShown: false,
+          hintText: null,
+          eliminatedOptions: [],
+          extraTimeAmount: 0,
+          phase: 'question',
+        });
+      },
       hostSkipQuestion: () => {
         if (get().isAnswerLocked) return;
         set((s) => ({
@@ -423,6 +432,7 @@ const useGameStore = create(
         playerCode: state.playerCode,
         gameStatus: state.gameStatus,
         currentRound: state.currentRound,
+        pendingRound: state.pendingRound,
         currentQuestionIndex: state.currentQuestionIndex,
         score: state.score,
         correctAnswers: state.correctAnswers,
