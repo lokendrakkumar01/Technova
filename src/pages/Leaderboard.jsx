@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Trophy, Crown, Medal, Award, ArrowLeft, RefreshCw, Users } from 'lucide-react';
@@ -15,10 +15,16 @@ export default function Leaderboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const requestInFlight = useRef(false);
 
   const loadStandings = useCallback(async () => {
+    if (requestInFlight.current) {
+      setIsRefreshing(false);
+      return;
+    }
+    requestInFlight.current = true;
     try {
-      const response = await fetch(`${API_URL}/api/leaderboard`, { cache: 'no-store' });
+      const response = await fetch(`${API_URL}/api/leaderboard`, { cache: 'no-store', headers: { Accept: 'application/json' } });
       if (!response.ok) throw new Error('Standings could not be loaded from the server.');
       const entries = await response.json();
       if (!Array.isArray(entries)) throw new Error('The server returned invalid standings.');
@@ -34,13 +40,13 @@ export default function Leaderboard() {
       setData(realEntries);
       setError('');
     } catch (err) {
-      setData([]);
-      setError(err.message || 'Could not connect to the standings service.');
+      setError(data.length ? 'Could not refresh standings. Showing the last successful results.' : (err.message || 'Could not connect to the standings service.'));
     } finally {
+      requestInFlight.current = false;
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [data.length]);
 
   useEffect(() => {
     void loadStandings();
@@ -109,7 +115,7 @@ export default function Leaderboard() {
 
         {isLoading && <div className="rounded-2xl border border-white/10 bg-navy-900/70 p-10 text-center text-sm text-white/50" role="status">Loading saved results…</div>}
 
-        {!error && visibleEntries.length > 0 && (
+        {visibleEntries.length > 0 && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
               {visibleEntries.slice(0, 3).map((item, idx) => (
