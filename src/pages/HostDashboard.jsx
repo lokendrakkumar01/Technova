@@ -138,6 +138,19 @@ export default function HostDashboard() {
     } catch (error) { setSharedGameError(error.message || 'Could not end the shared game session.'); }
   };
 
+  const handleOpenRegistration = async () => {
+    try {
+      const response = await fetch('/api/host/game/open-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-host-token': hostToken },
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not reopen registration.');
+      setSharedGameState(result.state);
+      setSharedGameError('');
+    } catch (error) { setSharedGameError(error.message || 'Could not reopen registration.'); }
+  };
+
   const deleteLeaderboardEntry = async (entry) => {
     const id = String(entry?.id || '').trim();
     if (!id || !window.confirm(`Remove ${entry.name} from the live session and saved leaderboard?`)) return;
@@ -418,6 +431,17 @@ export default function HostDashboard() {
                 <AlertTriangle className="w-5 h-5" />
                 END CONTEST
               </button>
+
+              {sharedGameState.status !== 'registration' && (
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmModal('openRegistration')}
+                  className="p-3 rounded-xl border border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/20 text-amber-200 font-display font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Users className="w-5 h-5" />
+                  OPEN REGISTRATION
+                </button>
+              )}
             </div>
             {questionLoadError && <p role="alert" className="text-xs text-rose-300">{questionLoadError}</p>}
           </div>
@@ -545,7 +569,9 @@ export default function HostDashboard() {
                 CONFIRM DESTRUCTIVE ACTION
               </h3>
               <p className="text-xs text-white/70 font-mono">
-                {showConfirmModal === 'endGame'
+                {showConfirmModal === 'openRegistration'
+                  ? 'This will stop the current contest and clear its live participant list so a new registration session can begin. Saved leaderboard results remain unchanged.'
+                  : showConfirmModal === 'endGame'
                   ? 'Are you certain you want to conclude the game session? Contestants will be transitioned to the final celebration screen.'
                   : 'Are you sure you want to reset the current score to 0 points?'}
               </p>
@@ -562,6 +588,8 @@ export default function HostDashboard() {
                   onClick={() => {
                     if (showConfirmModal === 'endGame') {
                       void handleFinishGame();
+                    } else if (showConfirmModal === 'openRegistration') {
+                      void handleOpenRegistration();
                     } else if (showConfirmModal === 'resetScore') {
                       hostResetScore();
                     }

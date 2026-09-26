@@ -265,6 +265,23 @@ app.post('/api/host/game/finish', requireHost, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/host/game/open-registration', requireHost, async (req, res) => {
+  try {
+    const state = await getLiveGameState();
+    const nextState = {
+      ...state,
+      status: 'registration',
+      approvedRound: 1,
+      pendingRound: null,
+      hostPaused: false,
+      participants: [],
+      updatedAt: new Date().toISOString(),
+    };
+    await saveLiveGameState(nextState);
+    res.json({ success: true, state: publicLiveGameState(nextState) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/game/round-ready', async (req, res) => {
   const participantId = String(req.body?.participantId || '').trim();
   const round = Number(req.body?.round);
