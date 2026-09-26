@@ -64,7 +64,7 @@ async function getLiveGameState() {
   if (isMongoConnected && db) {
     const saved = await db.collection('settings').findOne({ _id: 'live-game-state' });
     if (saved) {
-      const { _id, updatedAt, ...state } = saved;
+      const { _id, updatedAt: _updatedAt, ...state } = saved;
       liveGameState = { ...liveGameState, ...state };
     }
   }

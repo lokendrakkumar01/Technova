@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DEFAULT_QUESTION_BANK, normalizeQuestionBank } from '../data/questions';
+import { DEFAULT_QUESTION_BANK, SHOWDOWN_QUESTIONS, normalizeQuestionBank } from '../data/questions';
 
 const generateCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 

@@ -44,7 +44,6 @@ export default function HostDashboard() {
   const {
     gameStatus,
     currentRound,
-    pendingRound,
     currentQuestionIndex,
     score,
     player,
@@ -306,8 +305,8 @@ export default function HostDashboard() {
 
           <div className="p-4 rounded-xl border border-white/10 bg-navy-900/60 backdrop-blur-md">
             <div className="text-[10px] font-mono text-white/50 uppercase">Marshal State</div>
-            <div className={`font-display font-bold text-lg mt-1 ${hostPaused ? 'text-amber-400' : 'text-emerald-400'}`}>
-              {hostPaused ? 'PAUSED' : 'LIVE'}
+            <div className={`font-display font-bold text-lg mt-1 ${sharedGameState.hostPaused ? 'text-amber-400' : 'text-emerald-400'}`}>
+              {sharedGameState.hostPaused ? 'PAUSED' : 'LIVE'}
             </div>
             <div className="text-[10px] font-mono text-white/40 mt-0.5">TIMERS RUNNING</div>
           </div>
