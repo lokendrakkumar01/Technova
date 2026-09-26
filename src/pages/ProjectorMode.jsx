@@ -65,6 +65,8 @@ export default function ProjectorMode() {
   const { timeLeft, timerState } = useTimer({
     duration: roundConfig.timePerQuestion,
     isActive: phase === 'question' && gameStatus === 'playing',
+    isPaused: hostPaused,
+    questionKey: `${currentQuestionIndex}:${question?.id}`,
   });
 
   return (
