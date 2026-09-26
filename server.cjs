@@ -222,6 +222,7 @@ app.get('/api/host/game/state', requireHost, async (req, res) => {
 app.post('/api/host/game/start', requireHost, async (req, res) => {
   try {
     const state = await getLiveGameState();
+    if (state.status === 'playing') return res.status(409).json({ error: 'A contest is already in progress. End the current contest before starting another.' });
     if (!(state.participants || []).length) return res.status(409).json({ error: 'Register at least one player or team before starting.' });
     const nextState = {
       ...state,
@@ -300,7 +301,7 @@ app.post('/api/host/round-approve', requireHost, async (req, res) => {
 app.post('/api/participants/register', async (req, res) => {
   try {
     const state = await getLiveGameState();
-    if (state.status === 'playing') return res.status(409).json({ error: 'Registration is closed while a game is in progress.' });
+    if (state.status === 'playing') return res.status(409).json({ error: 'Registration is closed while a game is in progress. Ask the host to open /host, choose END CONTEST, and confirm before registering for the next event.' });
     const body = req.body || {};
     const mode = body.type === 'team' ? 'team' : 'individual';
     const participant = {

@@ -338,11 +338,11 @@ export default function HostDashboard() {
               <button
                 type="button"
                 onClick={() => void handleStartGame()}
-                disabled={isStartingGame || !sharedGameState.participants?.length}
+                disabled={isStartingGame || !sharedGameState.participants?.length || sharedGameState.status === 'playing'}
                 className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-display font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
               >
                 <Play className="w-5 h-5 fill-current" />
-                {isStartingGame ? 'LOADING QUESTIONS…' : sharedGameState.participants?.length ? 'START GAME' : 'WAITING FOR PLAYERS'}
+                {isStartingGame ? 'LOADING QUESTIONS…' : sharedGameState.status === 'playing' ? 'GAME IN PROGRESS' : sharedGameState.participants?.length ? 'START GAME' : 'WAITING FOR PLAYERS'}
               </button>
 
               {/* Pause / Resume */}
