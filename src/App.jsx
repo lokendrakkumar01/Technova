@@ -3,18 +3,46 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 
 // Page imports
-const LandingPage = lazy(() => import('./pages/LandingPage'))
-const HowToPlay = lazy(() => import('./pages/HowToPlay'))
-const ModeSelection = lazy(() => import('./pages/ModeSelection'))
-const Registration = lazy(() => import('./pages/Registration'))
-const ReadyScreen = lazy(() => import('./pages/ReadyScreen'))
-const GameScreen = lazy(() => import('./pages/GameScreen'))
-const HostDashboard = lazy(() => import('./pages/HostDashboard'))
-const ProjectorMode = lazy(() => import('./pages/ProjectorMode'))
-const Leaderboard = lazy(() => import('./pages/Leaderboard'))
-const Results = lazy(() => import('./pages/Results'))
-const AdminPanel = lazy(() => import('./pages/AdminPanel'))
-const Memories = lazy(() => import('./pages/Memories'))
+const CHUNK_RETRY_KEY = 'techdecode-chunk-retry';
+const lazyPage = (importPage) => lazy(async () => {
+  try {
+    const page = await importPage();
+    try { window.sessionStorage.removeItem(CHUNK_RETRY_KEY); } catch { /* Storage may be disabled. */ }
+    return page;
+  } catch (error) {
+    const message = String(error?.message || error);
+    const isChunkLoadError = /dynamically imported module|loading chunk|importing a module script|failed to fetch module/i.test(message);
+    let canRetry = false;
+    if (isChunkLoadError) {
+      try {
+        if (!window.sessionStorage.getItem(CHUNK_RETRY_KEY)) {
+          window.sessionStorage.setItem(CHUNK_RETRY_KEY, '1');
+          canRetry = true;
+        }
+      } catch { /* Skip automatic recovery when browser storage is disabled. */ }
+    }
+    if (canRetry) {
+      const retryUrl = new URL(window.location.href);
+      retryUrl.searchParams.set('_chunk_retry', String(Date.now()));
+      window.location.replace(retryUrl.toString());
+      return new Promise(() => {});
+    }
+    throw error;
+  }
+});
+
+const LandingPage = lazyPage(() => import('./pages/LandingPage'))
+const HowToPlay = lazyPage(() => import('./pages/HowToPlay'))
+const ModeSelection = lazyPage(() => import('./pages/ModeSelection'))
+const Registration = lazyPage(() => import('./pages/Registration'))
+const ReadyScreen = lazyPage(() => import('./pages/ReadyScreen'))
+const GameScreen = lazyPage(() => import('./pages/GameScreen'))
+const HostDashboard = lazyPage(() => import('./pages/HostDashboard'))
+const ProjectorMode = lazyPage(() => import('./pages/ProjectorMode'))
+const Leaderboard = lazyPage(() => import('./pages/Leaderboard'))
+const Results = lazyPage(() => import('./pages/Results'))
+const AdminPanel = lazyPage(() => import('./pages/AdminPanel'))
+const Memories = lazyPage(() => import('./pages/Memories'))
 import useGameStore from './store/gameStore'
 
 // ─── Inline 404 Component ─────────────────────────────────────────────────────
@@ -83,10 +111,10 @@ function NotFound() {
 }
 
 class AppErrorBoundary extends React.Component {
-  state = { hasError: false };
+  state = { hasError: false, errorMessage: '' };
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, errorMessage: String(error?.message || 'Unknown page error') };
   }
 
   componentDidCatch(error) {
@@ -100,6 +128,7 @@ class AppErrorBoundary extends React.Component {
           <section className="max-w-md text-center">
             <h1 className="font-display text-xl font-bold text-cyan-neon">PAGE FAILED TO LOAD</h1>
             <p className="mt-3 text-white/70">The page could not be started. Reload to try again.</p>
+            <p role="status" className="mt-2 break-words text-xs text-white/45">{this.state.errorMessage}</p>
             <button type="button" className="btn-primary mt-6" onClick={() => window.location.reload()}>
               Reload page
             </button>
