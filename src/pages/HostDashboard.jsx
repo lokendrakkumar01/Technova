@@ -39,24 +39,22 @@ export default function HostDashboard() {
 
   // Score adjust state
   const [pointsInput, setPointsInput] = useState(10);
+  const [scoreParticipantId, setScoreParticipantId] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(null);
 
   const {
-    gameStatus,
-    currentRound,
-    currentQuestionIndex,
-    score,
-    player,
-    team,
-    mode,
     nextQuestion,
     hostSkipQuestion,
     hostRevealAnswer,
     hostResetQuestion,
-    hostAddPoints,
-    hostRemovePoints,
-    hostResetScore,
+    hostForwardRound,
     loadQuestionBank,
+    startGame,
+    hostApproveRound,
+    hostEndGame,
+    hostPause,
+    hostResume,
+    resetGame,
   } = useGameStore();
 
   const refreshSavedLeaderboard = async (token = hostToken) => {
@@ -107,6 +105,7 @@ export default function HostDashboard() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Could not approve the round.');
       setSharedGameState(result.state);
+      hostApproveRound();
       setSharedGameError('');
     } catch (error) { setSharedGameError(error.message || 'Could not approve the round.'); }
   };
@@ -121,6 +120,7 @@ export default function HostDashboard() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Could not update the game pause state.');
       setSharedGameState(result.state);
+      (result.state.hostPaused ? hostPause : hostResume)();
       setSharedGameError('');
     } catch (error) { setSharedGameError(error.message || 'Could not update pause state.'); }
   };
@@ -134,6 +134,7 @@ export default function HostDashboard() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Could not end the shared game session.');
       setSharedGameState(result.state);
+      hostEndGame();
       setSharedGameError('');
     } catch (error) { setSharedGameError(error.message || 'Could not end the shared game session.'); }
   };
@@ -147,8 +148,47 @@ export default function HostDashboard() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Could not reopen registration.');
       setSharedGameState(result.state);
+      resetGame();
       setSharedGameError('');
     } catch (error) { setSharedGameError(error.message || 'Could not reopen registration.'); }
+  };
+
+  const handleGameAction = async (action) => {
+    try {
+      const response = await fetch('/api/host/game/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-host-token': hostToken },
+        body: JSON.stringify({ action }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not send the game control to participants.');
+      setSharedGameState(result.state);
+      setSharedGameError('');
+      if (action === 'next-question') nextQuestion();
+      else if (action === 'reveal-answer') hostRevealAnswer();
+      else if (action === 'skip-question') hostSkipQuestion();
+      else if (action === 'reset-question') hostResetQuestion();
+      else if (action === 'forward-round') hostForwardRound();
+    } catch (error) { setSharedGameError(error.message || 'Could not send the game control to participants.'); }
+  };
+
+  const handleAdjustParticipantScore = async (delta, reset = false) => {
+    if (!scoreParticipantId) {
+      setSharedGameError('Choose a live participant before changing a score.');
+      return;
+    }
+    try {
+      const response = await fetch('/api/host/participant/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-host-token': hostToken },
+        body: JSON.stringify({ participantId: scoreParticipantId, delta, reset }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not update the participant score.');
+      setSharedGameState(result.state);
+      setSharedGameError('');
+      await refreshSavedLeaderboard();
+    } catch (error) { setSharedGameError(error.message || 'Could not update the participant score.'); }
   };
 
   const deleteLeaderboardEntry = async (entry) => {
@@ -185,6 +225,7 @@ export default function HostDashboard() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Could not start the shared game session.');
       setSharedGameState(result.state);
+      startGame();
       setSharedGameError('');
     } catch (error) {
       setQuestionLoadError(error.message || 'Could not start the shared game session.');
@@ -274,15 +315,15 @@ export default function HostDashboard() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/host/display')}
+            <a
+              href="/host/display"
               target="_blank"
+              rel="noopener noreferrer"
               className="px-4 py-2.5 rounded-xl border border-cyan-neon/40 bg-cyan-neon/10 hover:bg-cyan-neon/20 text-cyan-neon text-xs font-display font-bold flex items-center gap-2 cursor-pointer transition-all"
             >
               <Tv className="w-4 h-4" />
               OPEN AUDITORIUM PROJECTOR MODE
-            </button>
+            </a>
           </div>
         </div>
 
@@ -291,29 +332,29 @@ export default function HostDashboard() {
           <div className="p-4 rounded-xl border border-white/10 bg-navy-900/60 backdrop-blur-md">
             <div className="text-[10px] font-mono text-white/50 uppercase">Active Contestant</div>
             <div className="font-display font-bold text-lg text-white truncate mt-1">
-              {(mode === 'team' ? team?.name : player?.name) || 'Not Connected'}
+              {sharedGameState.participants?.length || 0} / 150
             </div>
             <div className="text-[10px] font-mono text-cyan-neon mt-0.5">
-              MODE: {mode ? mode.toUpperCase() : 'NONE'}
+              {sharedGameState.participants?.filter((item) => item.mode === 'individual').length || 0} SOLO · {sharedGameState.participants?.filter((item) => item.mode === 'team').length || 0} TEAMS
             </div>
           </div>
 
           <div className="p-4 rounded-xl border border-white/10 bg-navy-900/60 backdrop-blur-md">
             <div className="text-[10px] font-mono text-white/50 uppercase">Game Phase</div>
             <div className="font-display font-bold text-lg text-purple-soft mt-1 uppercase">
-              {gameStatus}
+              {sharedGameState.status || 'registration'}
             </div>
             <div className="text-[10px] font-mono text-white/40 mt-0.5">
-              ROUND {currentRound} // Q{currentQuestionIndex + 1}
+              ROUND {sharedGameState.approvedRound || 1}{sharedGameState.pendingRound ? ` · ROUND ${sharedGameState.pendingRound} PENDING` : ''}
             </div>
           </div>
 
           <div className="p-4 rounded-xl border border-white/10 bg-navy-900/60 backdrop-blur-md">
             <div className="text-[10px] font-mono text-white/50 uppercase">System Score</div>
             <div className="font-display font-black text-2xl text-cyan-neon mt-1">
-              {score} PTS
+              {sharedGameState.participants?.filter((item) => item.completed).length || 0} COMPLETE
             </div>
-            <div className="text-[10px] font-mono text-emerald-400 mt-0.5">VERIFIED IN STORE</div>
+            <div className="text-[10px] font-mono text-emerald-400 mt-0.5">LIVE SESSION RESULTS</div>
           </div>
 
           <div className="p-4 rounded-xl border border-white/10 bg-navy-900/60 backdrop-blur-md">
@@ -362,6 +403,7 @@ export default function HostDashboard() {
               <button
                 type="button"
                 onClick={() => void handleTogglePause()}
+                disabled={sharedGameState.status !== 'playing'}
                 className={`p-3 rounded-xl border font-display font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
                   sharedGameState.hostPaused
                     ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
@@ -375,7 +417,8 @@ export default function HostDashboard() {
               {/* Next Question */}
               <button
                 type="button"
-                onClick={nextQuestion}
+                onClick={() => void handleGameAction('next-question')}
+                disabled={sharedGameState.status !== 'playing'}
                 className="p-3 rounded-xl border border-cyan-neon/30 bg-cyan-neon/10 hover:bg-cyan-neon/20 text-cyan-neon font-display font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer"
               >
                 <SkipForward className="w-5 h-5" />
@@ -385,7 +428,8 @@ export default function HostDashboard() {
               {/* Reveal Answer */}
               <button
                 type="button"
-                onClick={hostRevealAnswer}
+                onClick={() => void handleGameAction('reveal-answer')}
+                disabled={sharedGameState.status !== 'playing'}
                 className="p-3 rounded-xl border border-purple-soft/30 bg-purple-soft/10 hover:bg-purple-soft/20 text-purple-soft font-display font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer"
               >
                 <Eye className="w-5 h-5" />
@@ -395,7 +439,8 @@ export default function HostDashboard() {
               {/* Skip Question */}
               <button
                 type="button"
-                onClick={hostSkipQuestion}
+                onClick={() => void handleGameAction('skip-question')}
+                disabled={sharedGameState.status !== 'playing'}
                 className="p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-display font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer"
               >
                 <SkipForward className="w-5 h-5 text-white/50" />
@@ -405,7 +450,8 @@ export default function HostDashboard() {
               {/* Reset Question */}
               <button
                 type="button"
-                onClick={hostResetQuestion}
+                onClick={() => void handleGameAction('reset-question')}
+                disabled={sharedGameState.status !== 'playing'}
                 className="p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-display font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer"
               >
                 <RotateCcw className="w-5 h-5 text-white/50" />
@@ -415,7 +461,8 @@ export default function HostDashboard() {
               {/* End Round */}
               <button
                 type="button"
-                onClick={nextQuestion}
+                onClick={() => void handleGameAction('forward-round')}
+                disabled={sharedGameState.status !== 'playing'}
                 className="p-3 rounded-xl border border-purple-electric/30 bg-purple-electric/10 hover:bg-purple-electric/20 text-purple-soft font-display font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer"
               >
                 <StopCircle className="w-5 h-5" />
@@ -455,6 +502,20 @@ export default function HostDashboard() {
 
             <div className="space-y-3">
               <div>
+                <label htmlFor="score-participant" className="text-xs font-mono text-white/60 mb-1 block">Participant</label>
+                <select
+                  id="score-participant"
+                  value={scoreParticipantId}
+                  onChange={(event) => setScoreParticipantId(event.target.value)}
+                  className="w-full rounded-lg border border-white/15 bg-navy-950 px-3 py-2 text-sm text-white"
+                >
+                  <option value="">Choose a participant</option>
+                  {(sharedGameState.participants || []).map((participant) => (
+                    <option key={participant.id} value={participant.id}>{participant.name} · {participant.score || 0} pts</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="text-xs font-mono text-white/60 mb-1 block">Points Increment Value</label>
                 <div className="flex gap-2">
                   {[5, 10, 20, 30].map((val) => (
@@ -477,7 +538,8 @@ export default function HostDashboard() {
               <div className="grid grid-cols-2 gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => hostAddPoints(pointsInput)}
+                  onClick={() => void handleAdjustParticipantScore(pointsInput)}
+                  disabled={!scoreParticipantId}
                   className="py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-display font-bold flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <PlusCircle className="w-4 h-4" />
@@ -486,7 +548,8 @@ export default function HostDashboard() {
 
                 <button
                   type="button"
-                  onClick={() => hostRemovePoints(pointsInput)}
+                  onClick={() => void handleAdjustParticipantScore(-pointsInput)}
+                  disabled={!scoreParticipantId}
                   className="py-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-display font-bold flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <MinusCircle className="w-4 h-4" />
@@ -497,6 +560,7 @@ export default function HostDashboard() {
               <button
                 type="button"
                 onClick={() => setShowConfirmModal('resetScore')}
+                disabled={!scoreParticipantId}
                 className="w-full py-2.5 rounded-xl border border-rose-500/20 text-rose-400/80 hover:text-rose-400 hover:bg-rose-500/10 text-xs font-mono uppercase tracking-wider transition-all cursor-pointer"
               >
                 RESET SCORE TO 0
@@ -591,7 +655,7 @@ export default function HostDashboard() {
                     } else if (showConfirmModal === 'openRegistration') {
                       void handleOpenRegistration();
                     } else if (showConfirmModal === 'resetScore') {
-                      hostResetScore();
+                      void handleAdjustParticipantScore(0, true);
                     }
                     setShowConfirmModal(null);
                   }}

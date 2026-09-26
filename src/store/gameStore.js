@@ -54,6 +54,7 @@ const initialState = {
 
   // Host controls
   hostPaused: false,
+  lastHostActionId: 0,
   hostSkipped: false,
   hostPointsOverride: null,
   participantCount: 0,
@@ -119,6 +120,7 @@ const useGameStore = create(
           leaderboard: [entry, ...s.leaderboard.filter(l => l.id !== playerId).map(l => ({ ...l, isCurrentPlayer: false }))],
           team: null,
           mode: 'individual',
+          lastHostActionId: 0,
         }));
       },
 
@@ -141,6 +143,7 @@ const useGameStore = create(
           leaderboard: [entry, ...s.leaderboard.filter(l => l.id !== teamId).map(l => ({ ...l, isCurrentPlayer: false }))],
           player: null,
           mode: 'team',
+          lastHostActionId: 0,
         }));
       },
 
@@ -171,6 +174,7 @@ const useGameStore = create(
         showdownIndex: 0,
         scoreDelta: null,
         hostPaused: false,
+        lastHostActionId: 0,
         hostSkipped: false,
         hostPointsOverride: null,
         timeUsed: 0,
@@ -356,12 +360,24 @@ const useGameStore = create(
       // ─── HOST CONTROLS ───────────────────────────────────────────────────
       hostPause: () => set({ hostPaused: true }),
       hostResume: () => set({ hostPaused: false }),
+      applyHostActions: (actions) => {
+        for (const action of [...(Array.isArray(actions) ? actions : [])].sort((a, b) => Number(a.id) - Number(b.id))) {
+          const actionId = Number(action.id);
+          if (!Number.isInteger(actionId) || actionId <= (Number(get().lastHostActionId) || 0)) continue;
+          if (action.action === 'next-question') get().nextQuestion();
+          else if (action.action === 'forward-round') get().hostForwardRound();
+          else if (action.action === 'reveal-answer') get().hostRevealAnswer();
+          else if (action.action === 'skip-question') get().hostSkipQuestion();
+          else if (action.action === 'reset-question') get().hostResetQuestion();
+          set({ lastHostActionId: actionId });
+        }
+      },
       hostNextQuestion: () => { get().nextQuestion(); },
       hostApproveRound: () => {
         const { gameStatus, pendingRound, currentQuestionIndex, questionBank } = get();
         if (gameStatus !== 'roundApproval' || !pendingRound) return;
-        const nextQuestionIndex = currentQuestionIndex + 1;
-        if (!questionBank[nextQuestionIndex] || Number(questionBank[nextQuestionIndex].round) !== Number(pendingRound)) return;
+        const nextQuestionIndex = questionBank.findIndex((question, index) => index > currentQuestionIndex && Number(question.round) === Number(pendingRound));
+        if (nextQuestionIndex < 0) return;
         set({
           currentQuestionIndex: nextQuestionIndex,
           currentRound: Number(pendingRound),
@@ -376,6 +392,14 @@ const useGameStore = create(
           extraTimeAmount: 0,
           phase: 'question',
         });
+      },
+      hostForwardRound: () => {
+        const { gameStatus, currentQuestionIndex, questionBank } = get();
+        if (gameStatus !== 'playing') return;
+        const currentRound = Number(questionBank[currentQuestionIndex]?.round) || 1;
+        const nextQuestion = questionBank.find((question, index) => index > currentQuestionIndex && Number(question.round) > currentRound);
+        if (!nextQuestion) return;
+        set({ pendingRound: Number(nextQuestion.round), gameStatus: 'roundApproval' });
       },
       hostSkipQuestion: () => {
         if (get().isAnswerLocked) return;
@@ -435,6 +459,7 @@ const useGameStore = create(
         team: state.team,
         playerCode: state.playerCode,
         gameStatus: state.gameStatus,
+        lastHostActionId: state.lastHostActionId,
         currentRound: state.currentRound,
         pendingRound: state.pendingRound,
         currentQuestionIndex: state.currentQuestionIndex,

@@ -1,21 +1,61 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import useGameStore from '../store/gameStore';
 import useTimer from '../hooks/useTimer';
 import { ROUND_CONFIGS } from '../data/questions';
 
 export default function ProjectorMode() {
+  const [participantCount, setParticipantCount] = useState(0);
   const {
     currentRound,
     pendingRound,
     currentQuestionIndex,
-    score,
     gameStatus,
     phase,
     selectedAnswer,
     questionBank,
     getCurrentQuestion,
+    hostPaused,
+    beginRound,
+    startGame,
+    hostApproveRound,
+    hostEndGame,
+    hostPause,
+    hostResume,
+    applyHostActions,
+    lastHostActionId,
+    loadQuestionBank,
   } = useGameStore();
+
+  useEffect(() => {
+    let active = true;
+    let inFlight = false;
+    const syncProjector = async () => {
+      if (!active || inFlight) return;
+      inFlight = true;
+      try {
+        const response = await fetch(`/api/game/state?compact=1&afterActionId=${lastHostActionId}`, { cache: 'no-store' });
+        if (!response.ok) return;
+        const state = await response.json();
+        if (!active) return;
+        setParticipantCount(Number(state.participantCount) || 0);
+        if (state.status === 'playing' && !['playing', 'roundTransition', 'roundApproval'].includes(gameStatus)) {
+          startGame();
+          window.setTimeout(beginRound, 0);
+        }
+        if (state.status === 'finished' && gameStatus !== 'finished') hostEndGame();
+        if (Boolean(state.hostPaused) !== hostPaused) (state.hostPaused ? hostPause : hostResume)();
+        if (gameStatus === 'roundApproval' && Number(state.approvedRound) > Number(currentRound)) hostApproveRound();
+        applyHostActions(state.hostActions);
+      } catch { /* Keep the projector running if the game API reconnects. */ }
+      finally { inFlight = false; }
+    };
+    void syncProjector();
+    const timer = window.setInterval(syncProjector, 2000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [gameStatus, currentRound, hostPaused, lastHostActionId, beginRound, startGame, hostApproveRound, hostEndGame, hostPause, hostResume, applyHostActions]);
+
+  useEffect(() => { void loadQuestionBank(); }, [loadQuestionBank]);
 
   const question = getCurrentQuestion();
   const totalQuestions = questionBank.length;
@@ -56,10 +96,10 @@ export default function ProjectorMode() {
 
           <div className="px-6 py-2 rounded-2xl bg-white/5 border border-white/20 text-right">
             <div className="text-xs font-mono text-cyan-neon tracking-widest uppercase">
-              SCORE
+              PARTICIPANTS
             </div>
             <div className="font-display font-black text-3xl sm:text-5xl text-cyan-neon">
-              {score}
+              {participantCount}
             </div>
           </div>
         </div>
@@ -148,4 +188,3 @@ export default function ProjectorMode() {
     </div>
   );
 }
-

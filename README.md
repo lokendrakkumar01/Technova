@@ -26,7 +26,9 @@ Vite proxies API requests to port 5000. For production, run npm run build and th
 
 Set ADMIN_PIN and HOST_PIN in the server environment. Login issues an expiring session token; question updates and media uploads require the admin token. Never commit real environment values.
 
-Each question needs a round from 1 to 3, a pictogram, four answer options, and a correct answer matching one of those options. Add, edit, delete, or import questions in the admin panel; saved questions become the live game bank.
+The shared event registration supports up to 150 individual entries or teams. Team entries require a captain and 2–5 named members. Registration closes while the host has an active game; the host can open a fresh registration session from the host dashboard.
+
+The game has four rounds. Each question needs a round from 1 to 4, a pictogram, four answer options, and a correct answer matching one of those options. Add, edit, delete, or import questions in the admin panel; saved questions become the live game bank. Host controls and scores are synchronized through the server so the player screens and projector follow the same session.
 
 Media uploads support photos, videos, YouTube URLs, and HTTP(S) links. MongoDB stores metadata. Configure Cloudinary for durable media hosting. Local JSON and local disk storage are development fallbacks and may not persist on hosted services with ephemeral disks.
 

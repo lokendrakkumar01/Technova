@@ -35,19 +35,19 @@ export default function Registration() {
 
   const handleMemberCountChange = (count) => {
     const num = parseInt(count, 10);
-    const newMembers = [...teamData.members];
-    if (num > newMembers.length) {
-      while (newMembers.length < num) newMembers.push('');
-    } else {
-      newMembers.length = num;
-    }
-    setTeamData({ ...teamData, memberCount: num, members: newMembers });
+    if (!Number.isInteger(num) || num < 2 || num > 5) return;
+    setTeamData((current) => {
+      const members = current.members.slice(0, num);
+      while (members.length < num) members.push('');
+      return { ...current, memberCount: num, members };
+    });
   };
 
   const handleMemberNameChange = (index, value) => {
-    const newMembers = [...teamData.members];
-    newMembers[index] = value;
-    setTeamData({ ...teamData, members: newMembers });
+    setTeamData((current) => ({
+      ...current,
+      members: current.members.map((member, memberIndex) => memberIndex === index ? value : member),
+    }));
   };
 
   const handleIndividualSubmit = async (e) => {
@@ -84,9 +84,9 @@ export default function Registration() {
     if (!teamData.teamName.trim()) newErrors.teamName = 'Team name is required';
     if (!teamData.captainName.trim()) newErrors.captainName = 'Captain name is required';
 
-    const filledMembers = teamData.members.filter((m) => m.trim().length > 0);
-    if (filledMembers.length < 1) {
-      newErrors.members = 'Please add at least 1 team member name';
+    const members = teamData.members.slice(0, teamData.memberCount).map((member) => member.trim());
+    if (members.length !== teamData.memberCount || members.some((member) => !member)) {
+      newErrors.members = `Please enter all ${teamData.memberCount} team member names.`;
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -100,12 +100,12 @@ export default function Registration() {
       const registration = await syncWithBackend({
         type: 'team',
         ...teamData,
-        members: teamData.members.filter(Boolean),
+        members,
       });
       registerTeam({
         teamName: teamData.teamName,
         captainName: teamData.captainName,
-        members: teamData.members.filter(Boolean),
+        members,
         id: registration.id,
       });
     } catch (error) {

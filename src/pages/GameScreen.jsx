@@ -80,6 +80,8 @@ export default function GameScreen() {
     hostEndGame,
     hostPause,
     hostResume,
+    applyHostActions,
+    lastHostActionId,
     selectAnswer,
     timeout,
     nextQuestion,
@@ -127,31 +129,39 @@ export default function GameScreen() {
   useEffect(() => {
     if (!participantId) return undefined;
     let active = true;
+    let inFlight = false;
     const syncSharedGame = async () => {
+      if (!active || inFlight) return;
+      inFlight = true;
       try {
-        const response = await fetch('/api/game/state', { cache: 'no-store' });
+        const response = await fetch(`/api/game/state?compact=1&afterActionId=${lastHostActionId}`, { cache: 'no-store' });
         if (!response.ok) return;
         const state = await response.json();
         if (!active) return;
-        if (state.status === 'playing' && gameStatus === 'ready') startGame();
+        if (state.status === 'playing' && gameStatus === 'ready') {
+          startGame();
+          if (state.hostActions?.length) beginRound();
+        }
         if (state.status === 'finished' && gameStatus !== 'finished') hostEndGame();
         if (Boolean(state.hostPaused) !== hostPaused) (state.hostPaused ? hostPause : hostResume)();
         if (gameStatus === 'roundApproval' && pendingRound && Number(state.approvedRound) >= Number(pendingRound)) hostApproveRound();
+        applyHostActions(state.hostActions);
       } catch { /* Keep the game usable while the shared API reconnects. */ }
+      finally { inFlight = false; }
     };
     void syncSharedGame();
-    const timer = window.setInterval(syncSharedGame, 1500);
+    const timer = window.setInterval(syncSharedGame, 2000);
     return () => { active = false; window.clearInterval(timer); };
-  }, [participantId, gameStatus, pendingRound, hostPaused, startGame, hostApproveRound, hostEndGame, hostPause, hostResume]);
+  }, [participantId, gameStatus, pendingRound, hostPaused, lastHostActionId, startGame, beginRound, hostApproveRound, hostEndGame, hostPause, hostResume, applyHostActions]);
 
   useEffect(() => {
     if (!participantId || !participantName) return;
     fetch('/api/leaderboard/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: participantId, name: participantName, score, correctAnswers, totalAnswered, mode }),
+      body: JSON.stringify({ id: participantId, name: participantName, score, correctAnswers, totalAnswered, mode, completed: gameStatus === 'finished' }),
     }).catch(() => {});
-  }, [participantId, participantName, score, correctAnswers, totalAnswered, mode]);
+  }, [participantId, participantName, score, correctAnswers, totalAnswered, mode, gameStatus]);
 
   const baseDuration = ROUND_CONFIGS[currentRound]?.timePerQuestion || 20;
 
@@ -468,4 +478,3 @@ export default function GameScreen() {
     </div>
   );
 }
-
