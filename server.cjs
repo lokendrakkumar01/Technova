@@ -103,6 +103,7 @@ const memoryIdFilter = (id) => ({ $or: [
 const mongoUri = process.env.MONGODB_URI;
 const client = mongoUri ? new MongoClient(mongoUri, {
   serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
+  serverSelectionTimeoutMS: 10000,
 }) : null;
 
 let db = null;
@@ -126,8 +127,6 @@ async function connectToMongo() {
     isMongoConnected = false;
   }
 }
-connectToMongo();
-
 // ─── 2. CLOUDINARY CONFIGURATION ──────────────────────────────────────────────
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || '',
@@ -921,8 +920,19 @@ app.use((err, req, res, next) => {
 });
 
 // ─── START SERVER ─────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`>>> TECHDECODE Production Server running on port ${PORT} <<<`);
-  console.log(`>>> Health check: http://localhost:${PORT}/api/health <<<`);
+async function startServer() {
+  // Select the persistence backend before accepting traffic. Otherwise, early
+  // requests during a cold start can write locally just before MongoDB becomes
+  // active, making those registrations appear to disappear.
+  await connectToMongo();
+  app.listen(PORT, () => {
+    console.log(`>>> TECHDECODE Production Server running on port ${PORT} <<<`);
+    console.log(`>>> Health check: http://localhost:${PORT}/api/health <<<`);
+  });
+}
+
+startServer().catch((err) => {
+  console.error('Could not start the TECHDECODE server:', err.message);
+  process.exitCode = 1;
 });
 
