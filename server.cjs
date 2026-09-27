@@ -41,7 +41,7 @@ const writeLocalData = (name, value) => {
 let localLeaderboard = readLocalData('leaderboard.json');
 let localParticipants = readLocalData('participants.json');
 let localMemories = readLocalData('memories.json');
-let liveGameState = readLocalData('live-game-state.json', {
+const createEmptyLiveGameState = () => ({
   status: 'registration',
   approvedRound: 1,
   pendingRound: null,
@@ -51,6 +51,7 @@ let liveGameState = readLocalData('live-game-state.json', {
   hostActions: [],
   participants: [],
 });
+let liveGameState = readLocalData('live-game-state.json', createEmptyLiveGameState());
 async function saveLiveGameState(nextState) {
   liveGameState = nextState;
   if (isMongoConnected && db) {
@@ -70,7 +71,7 @@ async function getLiveGameState() {
     if (saved) {
       const { _id, updatedAt: _updatedAt, ...state } = saved;
       liveGameState = { ...liveGameState, ...state };
-    }
+    } else liveGameState = createEmptyLiveGameState();
   }
   return liveGameState;
 }
