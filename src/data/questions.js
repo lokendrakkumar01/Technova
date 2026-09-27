@@ -4,7 +4,7 @@ export const ROUNDS = [
   { id: 1, name: 'CODE LANGUAGE', tagline: 'Choose the right answer.', color: 'cyan', questions: [1, 10], answerMode: 'choice', timePerQuestion: 20, points: '10–30' },
   { id: 2, name: 'THINK LIKE A COMPUTER', tagline: 'Type the answer from the clue.', color: 'purple', questions: [11, 20], answerMode: 'text', timePerQuestion: 30, points: 15 },
   { id: 3, name: 'EMOJI DECODE', tagline: 'Decode the emoji clue and type your answer.', color: 'blue', questions: [21, 30], answerMode: 'emoji', timePerQuestion: 30, points: 20 },
-  { id: 4, name: 'RAPID FIRE', tagline: 'Type fast. Get it right.', color: 'gold', questions: [31, 35], answerMode: 'text', timePerQuestion: 45, points: 30 },
+  { id: 4, name: 'RAPID FIRE', tagline: 'Type fast. Get it right.', color: 'gold', questions: [31, 50], answerMode: 'text', timePerQuestion: 45, points: 30 },
 ];
 
 export const QUESTIONS = [
@@ -685,6 +685,7 @@ export const SHOWDOWN_QUESTIONS = [
 ];
 
 export const DEFAULT_QUESTION_BANK = [...QUESTIONS, ...SHOWDOWN_QUESTIONS];
+export const QUESTION_BANK_VERSION = 2;
 const EMOJI_ANSWER_ALIASES = {
   'Cloud Computing': ['☁️'],
   'Artificial Intelligence': ['🤖'],

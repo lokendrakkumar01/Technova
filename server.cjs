@@ -6,6 +6,7 @@ const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 require('dotenv').config();
 
 const app = express();
@@ -24,6 +25,17 @@ app.use(express.json({ limit: '2mb' }));
 // Ensure local uploads directory exists as fallback
 const uploadDir = path.join(__dirname, 'public', 'uploads');
 const dataDir = path.join(__dirname, 'data');
+let questionBankModulePromise;
+const getBundledQuestionBank = () => {
+  if (!questionBankModulePromise) {
+    const questionBankPath = pathToFileURL(path.join(__dirname, 'src', 'data', 'questions.js')).href;
+    questionBankModulePromise = import(questionBankPath).catch((error) => {
+      questionBankModulePromise = null;
+      throw error;
+    });
+  }
+  return questionBankModulePromise;
+};
 fs.mkdirSync(uploadDir, { recursive: true });
 fs.mkdirSync(dataDir, { recursive: true });
 app.use('/uploads', express.static(uploadDir));
@@ -508,8 +520,32 @@ app.post('/api/participants/register', async (req, res) => {
 app.get('/api/questions', async (req, res) => {
   try {
     if (isMongoConnected && db) {
-      const saved = await db.collection('settings').findOne({ _id: 'question-bank' });
-      return res.json(saved?.questions || []);
+      const [saved, bundled] = await Promise.all([
+        db.collection('settings').findOne({ _id: 'question-bank' }),
+        getBundledQuestionBank(),
+      ]);
+      const currentVersion = Number(bundled.QUESTION_BANK_VERSION) || 1;
+      if (!saved) return res.json(bundled.DEFAULT_QUESTION_BANK);
+      if ((Number(saved.version) || 0) >= currentVersion) return res.json(saved.questions || []);
+
+      const savedQuestions = Array.isArray(saved.questions) ? saved.questions : [];
+      const savedIds = new Set(savedQuestions.filter((question) => question?.id != null).map((question) => String(question.id)));
+      const migratedQuestions = [
+        ...savedQuestions,
+        ...bundled.DEFAULT_QUESTION_BANK.filter((question) => Number(question.round) === 4 && !savedIds.has(String(question.id))),
+      ];
+      const migrated = await db.collection('settings').updateOne(
+        {
+          _id: 'question-bank',
+          $or: [{ version: { $exists: false } }, { version: { $lt: currentVersion } }],
+        },
+        { $set: { questions: migratedQuestions, version: currentVersion, updatedAt: new Date() } }
+      );
+      if (migrated.matchedCount === 0) {
+        const latest = await db.collection('settings').findOne({ _id: 'question-bank' });
+        return res.json(latest?.questions || migratedQuestions);
+      }
+      return res.json(migratedQuestions);
     }
     res.json(readLocalData('questions.json'));
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -531,7 +567,14 @@ app.put('/api/questions', requireAdmin, async (req, res) => {
       points: roundPoints[Number(question.round)] ?? Math.max(0, Number(question.points) || 10),
       answerMode: ({ 1: 'choice', 2: 'text', 3: 'emoji', 4: 'text' })[Number(question.round)],
     }));
-    if (isMongoConnected && db) await db.collection('settings').replaceOne({ _id: 'question-bank' }, { _id: 'question-bank', questions: normalizedQuestions, updatedAt: new Date() }, { upsert: true });
+    if (isMongoConnected && db) {
+      const bundled = await getBundledQuestionBank();
+      await db.collection('settings').replaceOne(
+        { _id: 'question-bank' },
+        { _id: 'question-bank', questions: normalizedQuestions, version: Number(bundled.QUESTION_BANK_VERSION) || 1, updatedAt: new Date() },
+        { upsert: true }
+      );
+    }
     else writeLocalData('questions.json', normalizedQuestions);
     res.json({ success: true, count: normalizedQuestions.length });
   } catch (err) { res.status(500).json({ error: err.message }); }
